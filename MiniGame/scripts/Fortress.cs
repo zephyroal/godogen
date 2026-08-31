@@ -43,6 +43,11 @@ public partial class Fortress : Node3D
 
         float zFront = Team == Team.Blue ? ZMin : ZMax; // edge facing the enemy (toward map center)
 
+        // the #10 main city grows a GLB castle keep at its center — wall cells under its footprint make way
+        Vector3 keepHalf = Index == Game.FortressCount
+            ? Glb.ScaledHalfExtents(CastlePath(), Game.CastleHeight)
+            : Vector3.Zero;
+
         for (int r = 0; r < rows; r++)
         {
             float z = ZMin + 1.5f + r * Game.BlockSize;
@@ -53,6 +58,10 @@ public partial class Fortress : Node3D
             {
                 int laneIdx = baseLane + l;
                 bool isGate = gateRow && l == 1;
+                if (keepHalf != Vector3.Zero
+                    && Mathf.Abs(Game.LaneX[laneIdx] - Game.LaneX[baseLane + 1]) < keepHalf.X - 0.3f
+                    && Mathf.Abs(z - CenterZ) < keepHalf.Z - 0.3f)
+                    continue; // castle keep footprint
                 float prob = 0.16f + 0.022f * Index;
                 if (r == rows - 1) prob += 0.10f; // protect the core row
                 if (isGate || l == openLane) continue;
@@ -63,52 +72,81 @@ public partial class Fortress : Node3D
             }
         }
 
-        // core crystal on the last row, middle lane
+        // core crystal on the last row, middle lane. The #10 keep displaces wall cells and
+        // gate pillars, so its crystal is armored to keep the main city the toughest fortress.
         float coreZ = ZMin + 1.5f + (rows - 1) * Game.BlockSize;
-        Core = MakeBlock(Game.LaneX[baseLane + 1], 2.2f, coreZ, CoreMat(), hp: 90f + 12f * Index, laneIdx: baseLane + 1, isCore: true);
+        float coreHp = 90f + 12f * Index + (Index == Game.FortressCount ? 500f : 0f);
+        Core = MakeBlock(Game.LaneX[baseLane + 1], 2.2f, coreZ, CoreMat(), hp: coreHp, laneIdx: baseLane + 1, isCore: true);
         Core.Scale = new Vector3(0.87f, 0.73f, 0.87f);
         Core.RotationDegrees = new Vector3(0f, 45f, 0f);
 
         // glowing gate portal at the fortress entrance (middle lane, enemy-facing edge)
         BuildGate(zFront, baseLane);
 
-        // corner pillars (outside the lanes — target practice + HP pool, capped with battlements)
+        // corner pillars (outside the lanes — target practice + HP pool, capped with battlements).
+        // The gate-side pair becomes GLB watchtowers; the rear pair stays blocky target practice.
         float[] pillarX =
         {
             Game.LaneX[baseLane] - 3.5f,
             (Game.LaneX[baseLane + 1] + Game.LaneX[baseLane + 2]) * 0.5f,
         };
-        float[] pillarZ = { zFront, (ZMin + ZMax) - zFront };
+        float zRear = (ZMin + ZMax) - zFront;
         foreach (var px in pillarX)
-            foreach (var pz in pillarZ)
+        {
+            var watchtower = Glb.Create(TowerPath(), Game.TowerHeight);
+            if (watchtower != null)
+            {
+                watchtower.Position = new Vector3(px, 0f, zFront);
+                watchtower.RotationDegrees = new Vector3(0f, EnemyFacingYaw(), 0f);
+                AddChild(watchtower);
+            }
+            else
             {
                 for (int h = 0; h < 2; h++)
                 {
-                    var p = MakeBlock(px, 1.5f + h * Game.BlockSize, pz, WallMat(rng), hp: 40f, laneIdx: -1, isCore: false);
+                    var p = MakeBlock(px, 1.5f + h * Game.BlockSize, zFront, WallMat(rng), hp: 40f, laneIdx: -1, isCore: false);
                     p.Scale = new Vector3(0.5f, 1f, 0.5f);
                 }
-                AddBattlement(px, pz);
+                AddBattlement(px, zFront);
             }
 
-        // the ultimate main city wears a golden crown on its crystal
+            for (int h = 0; h < 2; h++)
+            {
+                var p = MakeBlock(px, 1.5f + h * Game.BlockSize, zRear, WallMat(rng), hp: 40f, laneIdx: -1, isCore: false);
+                p.Scale = new Vector3(0.5f, 1f, 0.5f);
+            }
+            AddBattlement(px, zRear);
+        }
+
+        // the ultimate main city rises a GLB castle keep at its center (golden crown as fallback)
         if (Index == Game.FortressCount)
         {
-            var crown = new MeshInstance3D
+            var keep = Glb.Create(CastlePath(), Game.CastleHeight);
+            if (keep != null)
             {
-                Mesh = new BoxMesh
+                keep.Position = new Vector3(Game.LaneX[baseLane + 1], 0f, CenterZ);
+                keep.RotationDegrees = new Vector3(0f, EnemyFacingYaw(), 0f); // gate toward the enemy
+                AddChild(keep);
+            }
+            else
+            {
+                var crown = new MeshInstance3D
                 {
-                    Size = new Vector3(1.3f, 0.7f, 1.3f),
-                    Material = new StandardMaterial3D
+                    Mesh = new BoxMesh
                     {
-                        AlbedoColor = new Color(1f, 0.82f, 0.25f),
-                        EmissionEnabled = true,
-                        Emission = new Color(1f, 0.8f, 0.2f),
-                        EmissionEnergyMultiplier = 1.2f,
+                        Size = new Vector3(1.3f, 0.7f, 1.3f),
+                        Material = new StandardMaterial3D
+                        {
+                            AlbedoColor = new Color(1f, 0.82f, 0.25f),
+                            EmissionEnabled = true,
+                            Emission = new Color(1f, 0.8f, 0.2f),
+                            EmissionEnergyMultiplier = 1.2f,
+                        },
                     },
-                },
-                Position = new Vector3(Game.LaneX[baseLane + 1], 5.2f, coreZ),
-            };
-            AddChild(crown);
+                    Position = new Vector3(Game.LaneX[baseLane + 1], 5.2f, coreZ),
+                };
+                AddChild(crown);
+            }
         }
 
         TotalHp = CurrentHp = SumBlockHp();
@@ -173,6 +211,12 @@ public partial class Fortress : Node3D
         return _font;
     }
     private static SystemFont _font;
+
+    private string CastlePath() => $"res://assets/glb/castle_{(Team == Team.Blue ? "blue" : "red")}.glb";
+    private string TowerPath() => $"res://assets/glb/tower_{(Team == Team.Blue ? "blue" : "red")}.glb";
+
+    /// <summary>Yaw that turns a GLB's -Z gate toward the enemy (blue faces -Z, red faces +Z).</summary>
+    private float EnemyFacingYaw() => Team == Team.Blue ? 0f : 180f;
 
     private StandardMaterial3D WallMat(System.Random rng)
     {

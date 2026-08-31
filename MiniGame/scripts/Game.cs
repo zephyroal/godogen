@@ -27,6 +27,9 @@ public partial class Game : Node3D
     public const int PlayerHp = 120;
     public const int AiHp = 90;
     public const int FortressCount = 10;
+    public const float CastleHeight = 12f; // GLB keep at the #10 main city
+    public const float TowerHeight = 6f;   // GLB watchtowers at fortress gates
+    public const float TreeHeight = 5f;    // GLB roadside pines
     public const float FrontlineSpawnZ = 20f; // 阶段1：出生在己方1号城池后方的前期交火位
 
     /// <summary>Six lanes flanking a central road. Blue side = 0..2 (x&lt;0), Red side = 3..5 (x&gt;0).</summary>
@@ -235,6 +238,7 @@ public partial class Game : Node3D
         var rockMat = new StandardMaterial3D { AlbedoColor = new Color(0.55f, 0.56f, 0.55f), Roughness = 1f };
         var trunkMesh = new BoxMesh { Size = new Vector3(0.9f, 2.4f, 0.9f), Material = trunkMat };
         var leafMesh = new BoxMesh { Size = new Vector3(2.6f, 2.8f, 2.6f) };
+        const string treePath = "res://assets/glb/tree.glb";
 
         for (int t = 0; t < 44; t++)
         {
@@ -242,6 +246,18 @@ public partial class Game : Node3D
             float x = side * (20.5f + (float)Rng.NextDouble() * 4.5f);
             float z = -180f + (float)Rng.NextDouble() * 360f;
             float s = 0.8f + (float)Rng.NextDouble() * 0.6f;
+            float yaw = (float)Rng.NextDouble() * 360f;
+
+            var tree = Glb.Create(treePath, TreeHeight);
+            if (tree != null)
+            {
+                tree.Position = new Vector3(x, 0f, z);
+                tree.RotationDegrees = new Vector3(0f, yaw, 0f);
+                tree.Scale = Vector3.One * s;
+                AddChild(tree);
+                continue;
+            }
+
             var trunk = new MeshInstance3D { Mesh = trunkMesh, Position = new Vector3(x, 1.2f * s, z), Scale = Vector3.One * s };
             var leaf = new MeshInstance3D
             {
