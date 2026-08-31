@@ -4,9 +4,10 @@ using Godot;
 namespace FortressRush;
 
 /// <summary>
-/// Temp GLB orientation check: renders all imported props at game scale from four
-/// cardinal cameras (axis markers: yellow +Z / magenta -Z / cyan +X / white -X).
-/// `godot --script test/ModelPreview.cs` — windowed, self-quits, PNGs to screenshots/.
+/// GLB orientation check: renders all imported props at game scale from four
+/// cardinal cameras (axis markers: yellow +Z / magenta -Z / cyan +X / white -X) —
+/// gates/flags face -Z when unrotated. `godot --script test/ModelPreview.cs`
+/// (windowed, self-quits, PNGs to screenshots/).
 /// </summary>
 public partial class ModelPreview : SceneTree
 {

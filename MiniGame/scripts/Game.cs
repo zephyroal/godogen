@@ -51,8 +51,8 @@ public partial class Game : Node3D
     private Camera3D _cam;
     private DirectionalLight3D _sun;
     private float _shake;
-    private readonly List<BlastFx> _fx = new();
-    private float _announceDelay;
+    private Vector3 _orbitFocus;
+    private float _orbitAngle;
 
     static Game() { RegisterActions(); }
 
@@ -97,25 +97,43 @@ public partial class Game : Node3D
             return;
         }
 
-        // chase camera: behind and above the runner, looking down the run axis (subway-surfers view)
         var focus = Player != null && IsInstanceValid(Player) ? Player.Position : Vector3.Zero;
-        int heading = Player != null ? Player.Heading : -1;
-        var camTarget = focus + new Vector3(0f, 12.5f, -heading * 19f);
-        _cam.Position = _cam.Position.Lerp(camTarget, Mathf.Min(1f, dt * 5f));
-        if (_shake > 0f)
+        if (GameOver)
         {
-            _shake -= dt;
-            float a = Mathf.Max(0f, _shake / 0.35f) * 0.6f;
-            _cam.Position += new Vector3(Rng.NextSingle() - 0.5f, (Rng.NextSingle() - 0.5f) * 0.5f, Rng.NextSingle() - 0.5f) * a;
+            // endgame: slow orbit around the decisive fortress while the end screen plays
+            _orbitAngle += dt * 0.32f;
+            var orbitTarget = _orbitFocus + new Vector3(Mathf.Cos(_orbitAngle) * 24f, 13f, Mathf.Sin(_orbitAngle) * 24f);
+            _cam.Position = _cam.Position.Lerp(orbitTarget, Mathf.Min(1f, dt * 2.2f));
+            _sun.Position = _orbitFocus + new Vector3(0f, 40f, 0f);
+            if (_shake > 0f)
+            {
+                _shake -= dt;
+                float a = Mathf.Max(0f, _shake / 0.35f) * 0.6f;
+                _cam.Position += new Vector3(Rng.NextSingle() - 0.5f, (Rng.NextSingle() - 0.5f) * 0.5f, Rng.NextSingle() - 0.5f) * a;
+            }
+            _cam.LookAt(_orbitFocus + new Vector3(0f, 5f, 0f), Vector3.Up);
         }
-        _cam.LookAt(focus + new Vector3(0f, 1.2f, heading * 14f), Vector3.Up);
-        _sun.Position = focus + new Vector3(0f, 40f, 0f);
+        else
+        {
+            // chase camera: behind and above the runner, looking down the run axis (subway-surfers view)
+            int heading = Player != null ? Player.Heading : -1;
+            var camTarget = focus + new Vector3(0f, 12.5f, -heading * 19f);
+            _cam.Position = _cam.Position.Lerp(camTarget, Mathf.Min(1f, dt * 5f));
+            if (_shake > 0f)
+            {
+                _shake -= dt;
+                float a = Mathf.Max(0f, _shake / 0.35f) * 0.6f;
+                _cam.Position += new Vector3(Rng.NextSingle() - 0.5f, (Rng.NextSingle() - 0.5f) * 0.5f, Rng.NextSingle() - 0.5f) * a;
+            }
+            _cam.LookAt(focus + new Vector3(0f, 1.2f, heading * 14f), Vector3.Up);
+            _sun.Position = focus + new Vector3(0f, 40f, 0f);
+        }
 
         // core crystals pulse; distant signs hidden to avoid label pile-up
         float pulse = 1f + 0.06f * Mathf.Sin(Time.GetTicksMsec() * 0.004f);
         foreach (var f in Fortresses)
         {
-            f.PulseCore(pulse);
+            f.TickVisuals(dt, pulse);
             f.UpdateVisibility(focus);
         }
     }
@@ -135,21 +153,44 @@ public partial class Game : Node3D
             BackgroundMode = Environment.BGMode.Sky,
             Sky = new Sky { SkyMaterial = sky },
             AmbientLightSource = Environment.AmbientSource.Sky,
-            AmbientLightEnergy = 1.0f,
+            AmbientLightEnergy = 0.55f,
             FogEnabled = true,
             FogLightColor = new Color(0.75f, 0.80f, 0.90f),
-            FogDensity = 0.005f,
+            FogDensity = 0.002f,
+            FogSkyAffect = 0.35f,
+            SsaoEnabled = true,
+            SsaoIntensity = 2.0f,
+            SdfgiEnabled = true,
+            SdfgiUseOcclusion = true,
+            SdfgiReadSkyLight = true,
+            SdfgiBounceFeedback = 0.3f,
+            GlowEnabled = true,
+            GlowIntensity = 0.6f,
+            GlowBloom = 0.05f,
+            TonemapMode = Environment.ToneMapper.Filmic,
         };
         AddChild(new WorldEnvironment { Environment = env });
 
+        // warm key light with soft shadows
         _sun = new DirectionalLight3D
         {
             ShadowEnabled = true,
-            LightEnergy = 1.2f,
+            LightEnergy = 1.25f,
+            LightColor = new Color(1f, 0.96f, 0.88f),
             DirectionalShadowMaxDistance = 70f,
         };
         _sun.RotationDegrees = new Vector3(-52f, -32f, 0f);
         AddChild(_sun);
+
+        // cool back fill for shape modeling (shadowless)
+        var fill = new DirectionalLight3D
+        {
+            ShadowEnabled = false,
+            LightEnergy = 0.25f,
+            LightColor = new Color(0.7f, 0.8f, 1.0f),
+        };
+        fill.RotationDegrees = new Vector3(-38f, 140f, 0f);
+        AddChild(fill);
 
         _cam = new Camera3D
         {
@@ -421,11 +462,7 @@ public partial class Game : Node3D
         b.Fortress.DamageBlock(b, dmg);
     }
 
-    public void AddFx(BlastFx fx)
-    {
-        AddChild(fx);
-        _fx.Add(fx);
-    }
+    public void AddFx(BlastFx fx) => AddChild(fx);
 
     public void Shake(float amount = 0.35f) => _shake = amount;
 
@@ -441,8 +478,23 @@ public partial class Game : Node3D
         Hud?.UpdateFortressSquares();
         Hud?.Announce($"{(f.Team == Team.Blue ? "蓝" : "红")}{f.Index} 号城池被摧毁！", 2.5f);
         if (GameOver) return;
-        if (f.Team == Team.Red && f.Index == FortressCount) EndGame(winner: Team.Blue);
-        else if (f.Team == Team.Blue && f.Index == FortressCount) EndGame(winner: Team.Red);
+        if (f.Team == Team.Red && f.Index == FortressCount)
+        {
+            BeginEndgameOrbit(f);
+            EndGame(winner: Team.Blue);
+        }
+        else if (f.Team == Team.Blue && f.Index == FortressCount)
+        {
+            BeginEndgameOrbit(f);
+            EndGame(winner: Team.Red);
+        }
+    }
+
+    /// <summary>Hand the camera from the chase rig to the victory orbit around the fallen keep.</summary>
+    private void BeginEndgameOrbit(Fortress f)
+    {
+        _orbitFocus = f.KeepCenter;
+        _orbitAngle = Mathf.Atan2(_cam.Position.Z - _orbitFocus.Z, _cam.Position.X - _orbitFocus.X);
     }
 
     private void EndGame(Team winner)

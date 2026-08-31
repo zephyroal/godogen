@@ -20,9 +20,18 @@ public partial class Fortress : Node3D
     public readonly List<Block> Blocks = new();
 
     public float CenterZ => (ZMin + ZMax) * 0.5f;
+    /// <summary>World position of the main-city keep / fortress heart (endgame camera focus).</summary>
+    public Vector3 KeepCenter => new(Game.LaneX[Game.LaneBase(Team) + 1], 0f, CenterZ);
     public Block Core { get; private set; }
     private Label3D _sign;
     private int _hpTicks = -1;
+
+    private Node3D _keep;                  // GLB castle of the #10 main city
+    private Vector3 _keepBase;
+    private Vector3 _crumbleDir;
+    private float _crumbleT = -1f;         // <0 idle; 0..1 = keep keeling over
+    private StandardMaterial3D _coreMat;  // per-fortress clone: hit-flash spikes the emissive
+    private float _coreFlash;
 
     public Fortress(Team team, int index, float zA, float zB, System.Random rng)
     {
@@ -76,7 +85,8 @@ public partial class Fortress : Node3D
         // gate pillars, so its crystal is armored to keep the main city the toughest fortress.
         float coreZ = ZMin + 1.5f + (rows - 1) * Game.BlockSize;
         float coreHp = 90f + 12f * Index + (Index == Game.FortressCount ? 500f : 0f);
-        Core = MakeBlock(Game.LaneX[baseLane + 1], 2.2f, coreZ, CoreMat(), hp: coreHp, laneIdx: baseLane + 1, isCore: true);
+        _coreMat = CoreMat();
+        Core = MakeBlock(Game.LaneX[baseLane + 1], 2.2f, coreZ, _coreMat, hp: coreHp, laneIdx: baseLane + 1, isCore: true);
         Core.Scale = new Vector3(0.87f, 0.73f, 0.87f);
         Core.RotationDegrees = new Vector3(0f, 45f, 0f);
 
@@ -127,6 +137,9 @@ public partial class Fortress : Node3D
                 keep.Position = new Vector3(Game.LaneX[baseLane + 1], 0f, CenterZ);
                 keep.RotationDegrees = new Vector3(0f, EnemyFacingYaw(), 0f); // gate toward the enemy
                 AddChild(keep);
+                _keep = keep;
+                _keepBase = keep.Position;
+                _crumbleDir = new Vector3(Mathf.Sin(Index * 2.1f), 0f, Mathf.Cos(Index * 1.3f)).Normalized();
             }
             else
             {
@@ -234,21 +247,16 @@ public partial class Fortress : Node3D
 
     private StandardMaterial3D CoreMat()
     {
-        int key = ((int)Team + 1) * 100 + 9;
-        if (!MatCache.TryGetValue(key, out var mat))
+        // fresh per fortress: hit-flash spikes the emissive, must not leak across cores
+        var c = Game.ColorOf(Team);
+        return new StandardMaterial3D
         {
-            var c = Game.ColorOf(Team);
-            mat = new StandardMaterial3D
-            {
-                AlbedoColor = c.Lightened(0.15f),
-                EmissionEnabled = true,
-                Emission = c,
-                EmissionEnergyMultiplier = 1.6f,
-                Roughness = 0.4f,
-            };
-            MatCache[key] = mat;
-        }
-        return mat;
+            AlbedoColor = c.Lightened(0.15f),
+            EmissionEnabled = true,
+            Emission = c,
+            EmissionEnergyMultiplier = 1.6f,
+            Roughness = 0.4f,
+        };
     }
 
     /// <summary>Glowing portal frame at the fortress gate (decorative, never blocks the lane).</summary>
@@ -307,6 +315,7 @@ public partial class Fortress : Node3D
     {
         if (Destroyed || !Blocks.Contains(b)) return;
         CurrentHp -= dmg;
+        _coreFlash = 1f; // the crystal winces
         b.TakeDamage(dmg); // may remove itself
         RefreshSign();
         if (CurrentHp <= 0f && !Destroyed) Collapse();
@@ -314,10 +323,24 @@ public partial class Fortress : Node3D
 
     public void OnBlockRemoved(Block b) => Blocks.Remove(b);
 
-    public void PulseCore(float scale)
+    /// <summary>Per-frame visuals: crystal idle pulse + hit flash, keep crumble after collapse.</summary>
+    public void TickVisuals(float dt, float pulse)
     {
         if (!Destroyed && Core != null && IsInstanceValid(Core))
-            Core.Scale = new Vector3(0.87f, 0.73f, 0.87f) * scale;
+        {
+            if (_coreFlash > 0f) _coreFlash = Mathf.Max(0f, _coreFlash - dt * 4f);
+            Core.Scale = new Vector3(0.87f, 0.73f, 0.87f) * pulse * (1f + 0.14f * _coreFlash);
+            if (_coreMat != null)
+                _coreMat.EmissionEnergyMultiplier = 1.6f + 3.4f * _coreFlash;
+        }
+
+        if (_crumbleT >= 0f && _keep != null && IsInstanceValid(_keep))
+        {
+            _crumbleT = Mathf.Min(1f, _crumbleT + dt / 1.4f);
+            float e = 1f - Mathf.Pow(1f - _crumbleT, 3f); // ease-out: the keep keels over
+            _keep.Position = new Vector3(_keepBase.X, _keepBase.Y - 2.8f * e, _keepBase.Z);
+            _keep.RotationDegrees = new Vector3(_crumbleDir.X * 16f * e, EnemyFacingYaw(), _crumbleDir.Z * 16f * e);
+        }
     }
 
     /// <summary>Hide the floating sign beyond ~95 units from the viewer to avoid distant label pile-up.</summary>
@@ -330,6 +353,7 @@ public partial class Fortress : Node3D
     private void Collapse()
     {
         Destroyed = true;
+        Game.Instance?.Shake(0.5f);
         foreach (var b in Blocks)
         {
             if (IsInstanceValid(b))
@@ -340,6 +364,13 @@ public partial class Fortress : Node3D
             }
         }
         Blocks.Clear();
+
+        // the main city's keep keels over with the fortress it guarded
+        if (_keep != null && IsInstanceValid(_keep))
+        {
+            _crumbleT = 0f;
+            Game.Instance?.AddChild(FX.BlockBurst(new Vector3(_keepBase.X, 6f, _keepBase.Z), Game.ColorOf(Team), 26));
+        }
 
         // rubble: flat gray boxes, purely visual, never block lanes
         var rubbleMat = new StandardMaterial3D { AlbedoColor = new Color(0.45f, 0.45f, 0.47f), Roughness = 1f };

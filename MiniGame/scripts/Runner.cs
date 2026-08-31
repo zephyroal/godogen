@@ -91,6 +91,8 @@ public partial class Runner : Node3D
         var game = Game.Instance;
         if (game.GameOver) return;
 
+        if (TryDefend(game)) return; // home defense overrides the attack push
+
         // stay on the enemy side: attackers belong on the enemy lane column
         int enemyBase = Game.LaneBase(Game.EnemyOf(Team));
         if (TargetLane < enemyBase || TargetLane >= enemyBase + 3)
@@ -148,6 +150,61 @@ public partial class Runner : Node3D
             _stuckTimer = 0f;
             if (target != null) SteerToBlocks(target);
         }
+    }
+
+    /// <summary>Home defense: while an enemy raider is hammering an own fortress, the nearest own
+    /// AI turns back, matches the raider's lane and intercepts (design pillar: 同时防守自家).</summary>
+    private bool TryDefend(Game game)
+    {
+        Fortress hot = null;
+        Runner raider = null;
+        float bestThreat = float.MaxValue;
+        foreach (var f in game.Fortresses)
+        {
+            if (f.Team != Team || f.Destroyed) continue;
+            foreach (var r in game.Runners)
+            {
+                if (r.Team == Team || r.Dead) continue;
+                if (r.Position.Z < f.ZMin - 8f || r.Position.Z > f.ZMax + 8f) continue;
+                float threat = Mathf.Abs(r.Position.Z - f.CenterZ);
+                if (threat < bestThreat) { bestThreat = threat; hot = f; raider = r; }
+            }
+        }
+        if (raider == null || hot == null) return false;
+
+        // only the nearest own AI answers the call; the rest keep pushing the attack
+        float myD = Mathf.Abs(Position.Z - hot.CenterZ);
+        foreach (var r in game.Runners)
+        {
+            if (r.Team != Team || r.IsPlayer || r.Dead || r == this) continue;
+            if (Mathf.Abs(r.Position.Z - hot.CenterZ) < myD) return false;
+        }
+
+        // converge on the raider's column, preferring the own-side lane with the clearest run
+        int ownBase = Game.LaneBase(Team);
+        int bestLane = NearestLane(raider.Position.X);
+        int fewest = int.MaxValue;
+        for (int l = 0; l < 3; l++)
+        {
+            int lane = ownBase + l;
+            if (Mathf.Abs(Game.LaneX[lane] - raider.Position.X) > 8f) continue;
+            int blocks = 0;
+            for (float d = 0f; d < 24f; d += 3f)
+                if (game.BlockAhead(lane, Position.Z + Heading * d, Heading) != null) blocks++;
+            if (blocks < fewest) { fewest = blocks; bestLane = lane; }
+        }
+        TargetLane = bestLane;
+
+        float dz = raider.Position.Z - Position.Z;
+        if (Mathf.Abs(dz) > 3f) Heading = (int)Mathf.Sign(dz);
+        if (raider.Position.DistanceTo(Position) < 9f)
+        {
+            TryBlast();
+            if (Mathf.Abs(raider.Position.X - Position.X) < 2.5f && Mathf.Abs(dz) < 8f && Mathf.Sign(dz) == Heading)
+                TryDash();
+        }
+        if (Speed < 0.1f) TryBlast(); // blocked by an own wall — the blast still catches the raider if close
+        return true;
     }
 
     /// <summary>Steer laterally toward the enemy lane whose surviving blocks are nearest (brings pillars/walls into blast reach).</summary>
