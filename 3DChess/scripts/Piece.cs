@@ -111,8 +111,8 @@ public partial class Piece : Node3D
             Font = font,
             FontSize = 50,
             OutlineSize = red ? 6 : 8,
-            Modulate = red ? new Color(0.68f, 0.12f, 0.08f) : new Color(0.13f, 0.11f, 0.09f),
-            OutlineModulate = new Color(0.96f, 0.91f, 0.80f),
+            Modulate = red ? new Color(0.68f, 0.12f, 0.08f) : new Color(0.91f, 0.86f, 0.76f),
+            OutlineModulate = red ? new Color(0.96f, 0.91f, 0.80f) : new Color(0.12f, 0.10f, 0.07f),
             Position = new Vector3(0f, 0.53f, 0f),
             RotationDegrees = new Vector3(-90f, 0f, 0f), // flat on the cap, readable from the camera side
             PixelSize = 0.004f,

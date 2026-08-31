@@ -112,8 +112,8 @@ public partial class HUD : CanvasLayer
 
         var menu = MkButton("菜单", 24);
         menu.CustomMinimumSize = new Vector2(150f, 74f);
-        Anchor(menu, Control.LayoutPreset.CenterBottom, -75f, -98f, 75f, -24f);
-        // ghost style: clearly secondary next to the solid undo/rematch buttons
+        Anchor(menu, Control.LayoutPreset.TopRight, -174f, 14f, -24f, 88f);
+        // ghost style: clearly secondary, top-right so it never covers the board
         menu.AddThemeStyleboxOverride("normal", Box(new Color(0.1f, 0.06f, 0.04f, 0.55f), new Color(0.4f, 0.31f, 0.19f, 0.75f)));
         menu.AddThemeStyleboxOverride("hover", Box(new Color(0.2f, 0.12f, 0.07f, 0.82f), GoldBorder));
         menu.AddThemeStyleboxOverride("pressed", Box(new Color(0.1f, 0.06f, 0.04f, 0.85f), new Color(0.4f, 0.31f, 0.19f)));

@@ -49,8 +49,8 @@ public partial class Board : Node3D
         };
         _trayMat = new StandardMaterial3D
         {
-            AlbedoTexture = tex,
-            Uv1Scale = new Vector3(1f, 2f, 1f),
+            AlbedoTexture = FX.WoodGrain(new Color(0.46f, 0.31f, 0.19f), new Color(0.27f, 0.17f, 0.10f), 5, 10f),
+            Uv1Scale = new Vector3(2f, 1f, 1f),
             Roughness = 0.6f,
         };
         AddChild(new MeshInstance3D

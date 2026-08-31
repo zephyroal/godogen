@@ -69,10 +69,11 @@ public partial class Game : Node3D
             BackgroundMode = Environment.BGMode.Sky,
             Sky = new Sky { SkyMaterial = sky },
             AmbientLightSource = Environment.AmbientSource.Sky,
-            AmbientLightEnergy = 0.75f,
+            AmbientLightEnergy = 0.6f,
             FogEnabled = true,
             FogLightColor = new Color(0.8f, 0.74f, 0.62f),
-            FogDensity = 0.011f,
+            FogDensity = 0.008f,
+            FogSkyAffect = 0.35f,
             SsaoEnabled = true,
             SsaoIntensity = 2.5f,
             SsaoRadius = 1.2f,
@@ -82,7 +83,7 @@ public partial class Game : Node3D
         var sun = new DirectionalLight3D
         {
             ShadowEnabled = true,
-            LightEnergy = 1.5f,
+            LightEnergy = 1.65f,
             DirectionalShadowMaxDistance = 40f,
         };
         sun.RotationDegrees = new Vector3(-58f, 30f, 0f);
