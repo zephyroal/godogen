@@ -227,10 +227,10 @@ public partial class Fortress : Node3D
 
         var glowMat = new StandardMaterial3D
         {
-            AlbedoColor = new Color(c.R, c.G, c.B, 0.32f),
+            AlbedoColor = new Color(c.R, c.G, c.B, 0.42f),
             EmissionEnabled = true,
             Emission = c,
-            EmissionEnergyMultiplier = 1.4f,
+            EmissionEnergyMultiplier = 1.8f,
             Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
             ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
         };
@@ -274,6 +274,13 @@ public partial class Fortress : Node3D
     {
         if (!Destroyed && Core != null && IsInstanceValid(Core))
             Core.Scale = new Vector3(0.87f, 0.73f, 0.87f) * scale;
+    }
+
+    /// <summary>Hide the floating sign beyond ~95 units from the viewer to avoid distant label pile-up.</summary>
+    public void UpdateVisibility(Vector3 viewer)
+    {
+        if (_sign == null) return;
+        _sign.Visible = Mathf.Abs(CenterZ - viewer.Z) < 95f;
     }
 
     private void Collapse()

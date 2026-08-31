@@ -108,10 +108,13 @@ public partial class Game : Node3D
         _cam.LookAt(focus + new Vector3(0f, 1.2f, heading * 14f), Vector3.Up);
         _sun.Position = focus + new Vector3(0f, 40f, 0f);
 
-        // core crystals pulse
+        // core crystals pulse; distant signs hidden to avoid label pile-up
         float pulse = 1f + 0.06f * Mathf.Sin(Time.GetTicksMsec() * 0.004f);
         foreach (var f in Fortresses)
+        {
             f.PulseCore(pulse);
+            f.UpdateVisibility(focus);
+        }
     }
 
     // ---- world construction ----
