@@ -45,6 +45,15 @@ public partial class Game : Node3D
         Hud = new HUD { Name = "HUD" };
         AddChild(Hud);
         UpdateCamera();
+
+        // instant rematch: re-enter the previous mode without the selection screen
+        if (AutoStart != null)
+        {
+            var mode = AutoStart.Value;
+            AutoStart = null;
+            Hud.HideStart();
+            ChooseMode(mode);
+        }
     }
 
     private void BuildEnvironment()
@@ -108,12 +117,19 @@ public partial class Game : Node3D
         float dt = (float)delta;
         UpdateCamera();
 
+        // move animation completion: landing dust, then post-move logic
         if (_movingPiece != null && _movingPiece.AnimDone)
         {
+            var dust = FX.Burst(_movingPiece.Position + new Vector3(0f, 0.05f, 0f),
+                new Color(0.55f, 0.44f, 0.30f), 8, 0.8f, 1.8f);
+            AddChild(dust);
+            var dustTimer = GetTree().CreateTimer(1.2f);
+            dustTimer.Timeout += dust.QueueFree;
             _movingPiece = null;
             FinishMove();
         }
 
+        // AI result polling: apply only when the board is at rest, keep the move until it is played
         if (_aiTask != null && _aiTask.IsCompleted)
         {
             var result = _aiTask.Result;
@@ -121,16 +137,19 @@ public partial class Game : Node3D
             _aiApplyDelay = 0.4f;
             _pendingAiMove = result.Move;
         }
-        if (_pendingAiMove != null)
+        if (_pendingAiMove != null && _movingPiece == null)
         {
             _aiApplyDelay -= dt;
             if (_aiApplyDelay <= 0f)
             {
                 var m = _pendingAiMove.Value;
-                _pendingAiMove = null;
                 var legal = Rules.LegalMoves(Position.Cells, Position.Turn);
-                if (legal.Contains(m)) ExecuteMove(m);
-                else if (legal.Count > 0) ExecuteMove(legal[0]); // never stall
+                if (legal.Count > 0)
+                {
+                    var chosen = legal.Contains(m) ? m : legal[0]; // never stall
+                    _pendingAiMove = null;
+                    ExecuteMove(chosen);
+                }
             }
         }
     }
@@ -196,7 +215,7 @@ public partial class Game : Node3D
     {
         if (ev is InputEventKey { Pressed: true } key)
         {
-            if (key.PhysicalKeycode == Key.R && GameOver) Restart();
+            if (key.PhysicalKeycode == Key.R && GameOver) Rematch();
             else if (key.PhysicalKeycode == Key.U) Undo();
         }
     }
@@ -238,6 +257,13 @@ public partial class Game : Node3D
                 ExecuteMove(_legalCache[mi]);
                 return;
             }
+            if (Position.Cells[idx] != 0 && (Position.Cells[idx] > 0) == (Position.Turn == Side.Red))
+            {
+                Select(idx); // switch to another own piece
+                return;
+            }
+            Board.ShowIllegal(idx); // non-legal target: brief red flash, keep the selection
+            return;
         }
 
         if (idx >= 0 && Position.Cells[idx] != 0 &&
@@ -316,8 +342,15 @@ public partial class Game : Node3D
         {
             GameOver = true;
             Board.ShowCheck(Rules.InCheck(Position.Cells, Position.Turn) ? Rules.FindKing(Position.Cells, Position.Turn) : null);
-            Hud.SetTurn(null, false);
+            Hud.SetTurn(null, false, 0);
             Hud.ShowEnd(loser == Side.Red ? Side.Black : Side.Red, mate);
+
+            // celebration burst over the defeated king
+            var kPos = Board.WorldOf(Rules.FindKing(Position.Cells, loser));
+            var burst = FX.Burst(kPos + new Vector3(0f, 0.6f, 0f), new Color(1f, 0.85f, 0.3f), 42, 3f, 6.5f);
+            AddChild(burst);
+            var timer = GetTree().CreateTimer(1.4f);
+            timer.Timeout += burst.QueueFree;
             return;
         }
 
@@ -326,7 +359,7 @@ public partial class Game : Node3D
         if (inCheck) Hud.FlashCheck();
 
         bool aiTurn = CurrentMode == Mode.VsAI && Position.Turn == Side.Black;
-        Hud.SetTurn(Position.Turn, aiTurn);
+        Hud.SetTurn(Position.Turn, aiTurn, Position.History.Count + 1);
         if (aiTurn) StartAI();
     }
 
@@ -340,14 +373,23 @@ public partial class Game : Node3D
 
     // ---- lifecycle ----
 
+    /// <summary>Rematch instantly in the same mode; the static survives the scene reload.</summary>
+    public static Mode? AutoStart;
+
     public void ChooseMode(Mode mode)
     {
         CurrentMode = mode;
         GameStarted = true;
-        Hud.SetTurn(Position.Turn, false);
+        Hud.SetTurn(Position.Turn, false, 1);
     }
 
-    public void Restart() => GetTree().ReloadCurrentScene();
+    public void Rematch()
+    {
+        AutoStart = CurrentMode;
+        GetTree().ReloadCurrentScene();
+    }
+
+    public void Menu() => GetTree().ReloadCurrentScene();
 
     public void Undo()
     {
@@ -391,7 +433,7 @@ public partial class Game : Node3D
         if (Position.History.Count > 0) Board.ShowLastMove(Position.History[^1].Move);
         else Board.HideLastMove();
         Board.ShowCheck(Rules.InCheck(Position.Cells, Position.Turn) ? Rules.FindKing(Position.Cells, Position.Turn) : null);
-        Hud.SetTurn(Position.Turn, false);
+        Hud.SetTurn(Position.Turn, false, Position.History.Count + 1);
         if (CurrentMode == Mode.VsAI && Position.Turn == Side.Black) StartAI();
     }
 }

@@ -32,7 +32,7 @@ public static class AI
         long nodes = 0;
         List<(Move M, int S)> lastScored = null;
 
-        for (int depth = 1; depth <= 5; depth++)
+        for (int depth = 1; depth <= 8; depth++)
         {
             if (sw.ElapsedMilliseconds > msCap * 0.4) break;
 

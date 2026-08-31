@@ -62,7 +62,7 @@ public partial class HUD : CanvasLayer
         _turnPill.Size = new Vector2(300f, 30f);
         _turnBg.AddChild(_turnPill);
         AddChild(_turnBg);
-        SetTurn(Side.Red, false);
+        SetTurn(Side.Red, false, 1);
 
         // check flash
         _checkFlash = MkLabel("将军！", 52, new Color(1f, 0.25f, 0.2f), Godot.HorizontalAlignment.Center);
@@ -71,17 +71,23 @@ public partial class HUD : CanvasLayer
         _checkFlash.Visible = false;
         AddChild(_checkFlash);
 
-        // in-game buttons
+        // in-game buttons: 悔棋 | 菜单 | 再来一局
         var undo = MkButton("悔棋 (U)", 24);
         undo.CustomMinimumSize = new Vector2(150f, 70f);
         undo.Position = new Vector2(28f, 620f);
         undo.Pressed += () => Game.Instance?.Undo();
         AddChild(undo);
 
-        var reset = MkButton("新对局", 24);
+        var menu = MkButton("菜单", 24);
+        menu.CustomMinimumSize = new Vector2(150f, 70f);
+        menu.Position = new Vector2(565f, 620f);
+        menu.Pressed += () => Game.Instance?.Menu();
+        AddChild(menu);
+
+        var reset = MkButton("再来一局", 24);
         reset.CustomMinimumSize = new Vector2(150f, 70f);
         reset.Position = new Vector2(1102f, 620f);
-        reset.Pressed += () => Game.Instance?.Restart();
+        reset.Pressed += () => Game.Instance?.Rematch();
         AddChild(reset);
 
         BuildStartOverlay();
@@ -140,11 +146,18 @@ public partial class HUD : CanvasLayer
         _endOverlay.AddChild(_endReason);
 
         var again = MkButton("再来一局 (R)", 30);
-        again.Position = new Vector2(500f, 390f);
-        again.Pressed += () => Game.Instance?.Restart();
+        again.Position = new Vector2(360f, 390f);
+        again.Pressed += () => Game.Instance?.Rematch();
         _endOverlay.AddChild(again);
+
+        var toMenu = MkButton("返回菜单", 26);
+        toMenu.Position = new Vector2(700f, 400f);
+        toMenu.Pressed += () => Game.Instance?.Menu();
+        _endOverlay.AddChild(toMenu);
         AddChild(_endOverlay);
     }
+
+    public void HideStart() => _startOverlay.Visible = false;
 
     public override void _Process(double delta)
     {
@@ -156,7 +169,7 @@ public partial class HUD : CanvasLayer
         }
     }
 
-    public void SetTurn(Side? turn, bool thinking)
+    public void SetTurn(Side? turn, bool thinking, int moveNumber)
     {
         if (turn == null)
         {
@@ -165,7 +178,8 @@ public partial class HUD : CanvasLayer
             return;
         }
         bool red = turn == Side.Red;
-        _turnPill.Text = thinking ? "黑方思考中…" : red ? "红方行棋" : "黑方行棋";
+        string text = thinking ? "黑方思考中…" : red ? "红方行棋" : "黑方行棋";
+        _turnPill.Text = moveNumber > 0 ? $"第 {moveNumber} 手 · {text}" : text;
         _turnPill.Modulate = red ? new Color(1f, 0.55f, 0.45f) : new Color(0.75f, 0.85f, 1f);
     }
 

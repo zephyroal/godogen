@@ -24,9 +24,22 @@ public partial class RulesProbe : SceneTree
         TestCheckmate();
         TestStalemate();
         TestUndo();
+        TestAISanity();
 
         GD.Print($"=== RULES PROBE: {_pass} passed, {_fail} failed ===");
         Quit(_fail == 0 ? 0 : 1);
+    }
+
+    private void TestAISanity()
+    {
+        var p = Position.Initial();
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var result = AI.Search(p.Cells, Side.Black, 900);
+        sw.Stop();
+        var legal = Rules.LegalMoves(p.Cells, Side.Black);
+        GD.Print($"  AI: depth={result.Depth} nodes={result.Nodes} time={sw.ElapsedMilliseconds}ms move={result.Move}");
+        Check(legal.Contains(result.Move), "AI returns a legal move");
+        Check(sw.ElapsedMilliseconds < 2500, "AI search respects the time cap");
     }
 
     private void Check(bool ok, string name)

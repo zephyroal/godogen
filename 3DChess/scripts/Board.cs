@@ -16,6 +16,9 @@ public partial class Board : Node3D
 
     private readonly List<Node3D> _moveMarks = new();
     private Node3D _selRing, _checkRing, _lastFrom, _lastTo;
+    private MeshInstance3D _illegalMark;
+    private StandardMaterial3D _illegalMat;
+    private float _pulseT, _illegalT;
 
     public override void _Ready()
     {
@@ -243,6 +246,56 @@ public partial class Board : Node3D
             };
             AddChild(m);
             if (slot == 0) _lastFrom = m; else _lastTo = m;
+        }
+
+        // illegal-target flash mark
+        _illegalMat = new StandardMaterial3D
+        {
+            AlbedoColor = new Color(1f, 0.2f, 0.15f, 0.8f),
+            EmissionEnabled = true,
+            Emission = new Color(1f, 0.15f, 0.1f),
+            EmissionEnergyMultiplier = 1.6f,
+            Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+        };
+        _illegalMark = new MeshInstance3D
+        {
+            Mesh = new BoxMesh { Size = new Vector3(0.55f, 0.02f, 0.55f), Material = _illegalMat },
+            Visible = false,
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+        };
+        AddChild(_illegalMark);
+    }
+
+    /// <summary>Brief red flash on an illegal target.</summary>
+    public void ShowIllegal(int idx)
+    {
+        var w = WorldOf(idx);
+        _illegalMark.Position = new Vector3(w.X, 0.05f, w.Z);
+        _illegalMark.Visible = true;
+        _illegalT = 0.45f;
+    }
+
+    public override void _Process(double delta)
+    {
+        float dt = (float)delta;
+        _pulseT += dt;
+
+        // breathing pulse on markers
+        float dotS = 1f + 0.12f * Mathf.Sin(_pulseT * 5f);
+        foreach (var m in _moveMarks)
+            if (IsInstanceValid(m)) m.Scale = Vector3.One * dotS;
+        _selRing.Scale = Vector3.One * (1f + 0.08f * Mathf.Sin(_pulseT * 4f));
+        _checkRing.Scale = Vector3.One * (1f + 0.16f * Mathf.Sin(_pulseT * 6f));
+
+        // illegal flash fade
+        if (_illegalT > 0f)
+        {
+            _illegalT -= dt;
+            float a = Mathf.Max(0f, _illegalT / 0.45f);
+            _illegalMat.AlbedoColor = new Color(1f, 0.2f, 0.15f, 0.8f * a);
+            _illegalMark.Scale = Vector3.One * (1f + 0.25f * (1f - a));
+            if (_illegalT <= 0f) _illegalMark.Visible = false;
         }
     }
 
