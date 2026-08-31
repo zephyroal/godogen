@@ -1,6 +1,7 @@
 .claude/
 .codex
 .codex/
+.codely-cli/
 .playwright-cli/
 .playwright
 **/__pycache__

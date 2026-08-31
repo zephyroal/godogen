@@ -94,6 +94,7 @@ ffmpeg -y -framerate 30 -start_number 0 -i "screenshots/result/frame%08d.png" -f
 > 引擎路径：`D:\godogen\Godot_v4.7.1-stable_mono_win64\Godot_v4.7.1-stable_mono_win64_console.exe`（Windows 本机）。
 > 证明产物：`screenshots/result/video.mp4`（~53s）+ `screenshots/01..06_*.png` 关键帧。
 > ffmpeg（winget 版）不支持 `-pattern_type glob`，用 `frame%08d.png` 序号模式；Windows 环境无需 xvfb。
+> 3D 模型升级需求：见 [3DModelRequirements.md](3DModel/3DModelRequirements.md)（模型清单 + 提示词 + 格式需求）。
 
 ## 已知设计取舍
 
