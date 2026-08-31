@@ -1,0 +1,397 @@
+using System.Collections.Generic;
+using Godot;
+
+namespace Xiangqi3D;
+
+/// <summary>Root of the match: camera, lights, pieces, input picking, move flow, AI scheduling.
+/// Taps arrive as (emulated) left mouse clicks — one path for touch and mouse; finger drags orbit/zoom the camera.</summary>
+public partial class Game : Node3D
+{
+    public enum Mode { VsAI, TwoPlayers }
+
+    public static Game Instance { get; private set; }
+
+    public new Position Position = Position.Initial();
+    public Mode CurrentMode = Mode.VsAI;
+    public bool GameStarted;
+    public bool GameOver;
+
+    public Camera3D Cam { get; private set; }
+    public Board Board { get; private set; }
+    public HUD Hud { get; private set; }
+    public readonly List<Piece> AllPieces = new();
+    private readonly Dictionary<int, Piece> _pieces = new();
+    private readonly Dictionary<int, Vector2> _touchPos = new();
+    private float _lastPinchDist;
+
+    private Piece _selected;
+    private List<Move> _legalCache = new();
+    private Piece _movingPiece;
+    private System.Threading.Tasks.Task<AI.Result> _aiTask;    private Move? _pendingAiMove;
+    private float _aiApplyDelay;
+    private int _redCaptured, _blackCaptured;
+
+    // camera orbit
+    public float Yaw, Pitch = 0.95f, Dist = 14.2f;
+    private readonly Vector3 _camTarget = new(0f, 0f, 0.3f);
+
+    public override void _Ready()
+    {
+        Instance = this;
+        BuildEnvironment();
+        Board = new Board();
+        AddChild(Board);
+        SpawnPieces();
+        Hud = new HUD { Name = "HUD" };
+        AddChild(Hud);
+        UpdateCamera();
+    }
+
+    private void BuildEnvironment()
+    {
+        var sky = new ProceduralSkyMaterial
+        {
+            SkyTopColor = new Color(0.35f, 0.45f, 0.62f),
+            SkyHorizonColor = new Color(0.78f, 0.72f, 0.62f),
+            GroundBottomColor = new Color(0.30f, 0.24f, 0.18f),
+        };
+        var env = new Environment
+        {
+            BackgroundMode = Environment.BGMode.Sky,
+            Sky = new Sky { SkyMaterial = sky },
+            AmbientLightSource = Environment.AmbientSource.Sky,
+            AmbientLightEnergy = 1.1f,
+            FogEnabled = true,
+            FogLightColor = new Color(0.8f, 0.75f, 0.65f),
+            FogDensity = 0.008f,
+        };
+        AddChild(new WorldEnvironment { Environment = env });
+
+        var sun = new DirectionalLight3D
+        {
+            ShadowEnabled = true,
+            LightEnergy = 1.25f,
+            DirectionalShadowMaxDistance = 40f,
+        };
+        sun.RotationDegrees = new Vector3(-58f, 30f, 0f);
+        AddChild(sun);
+
+        var fill = new DirectionalLight3D { LightEnergy = 0.35f, ShadowEnabled = false };
+        fill.RotationDegrees = new Vector3(-30f, -140f, 0f);
+        AddChild(fill);
+
+        Cam = new Camera3D { Fov = 42f, Near = 0.1f, Far = 100f };
+        AddChild(Cam);
+        Cam.MakeCurrent();
+    }
+
+    private void SpawnPieces()
+    {
+        for (int i = 0; i < 90; i++)
+        {
+            int p = Position.Cells[i];
+            if (p == 0) continue;
+            var piece = new Piece
+            {
+                Index = i,
+                Side = p > 0 ? Side.Red : Side.Black,
+                Type = (PieceType)System.Math.Abs(p),
+            };
+            AddChild(piece);
+            AllPieces.Add(piece);
+            _pieces[i] = piece;
+        }
+    }
+
+    public override void _Process(double delta)
+    {
+        float dt = (float)delta;
+        UpdateCamera();
+
+        if (_movingPiece != null && _movingPiece.AnimDone)
+        {
+            _movingPiece = null;
+            FinishMove();
+        }
+
+        if (_aiTask != null && _aiTask.IsCompleted)
+        {
+            var result = _aiTask.Result;
+            _aiTask = null;
+            _aiApplyDelay = 0.4f;
+            _pendingAiMove = result.Move;
+        }
+        if (_pendingAiMove != null)
+        {
+            _aiApplyDelay -= dt;
+            if (_aiApplyDelay <= 0f)
+            {
+                var m = _pendingAiMove.Value;
+                _pendingAiMove = null;
+                var legal = Rules.LegalMoves(Position.Cells, Position.Turn);
+                if (legal.Contains(m)) ExecuteMove(m);
+                else if (legal.Count > 0) ExecuteMove(legal[0]); // never stall
+            }
+        }
+    }
+
+    private void UpdateCamera()
+    {
+        Pitch = Mathf.Clamp(Pitch, 0.5f, 1.35f);
+        Dist = Mathf.Clamp(Dist, 7f, 20f);
+        var off = new Vector3(
+            Mathf.Sin(Yaw) * Mathf.Cos(Pitch),
+            Mathf.Sin(Pitch),
+            Mathf.Cos(Yaw) * Mathf.Cos(Pitch)) * Dist;
+        Cam.Position = _camTarget + off;
+        Cam.LookAt(_camTarget, Vector3.Up);
+    }
+
+    // ---- input: taps via (emulated) left click; camera via touch drag / pinch / right-drag / wheel ----
+
+    public override void _UnhandledInput(InputEvent ev)
+    {
+        switch (ev)
+        {
+            case InputEventMouseButton mouse:
+                if (mouse.ButtonIndex == MouseButton.Left && mouse.Pressed) TapScreen(mouse.Position);
+                else if (mouse.ButtonIndex == MouseButton.WheelUp) Dist *= 0.92f;
+                else if (mouse.ButtonIndex == MouseButton.WheelDown) Dist *= 1.08f;
+                break;
+
+            case InputEventScreenTouch touch:
+                if (touch.Pressed) _touchPos[touch.Index] = touch.Position;
+                else
+                {
+                    _touchPos.Remove(touch.Index);
+                    if (_touchPos.Count < 2) _lastPinchDist = 0f;
+                }
+                break;
+
+            case InputEventScreenDrag drag:
+                _touchPos[drag.Index] = drag.Position;
+                if (_touchPos.Count >= 2)
+                {
+                    var pts = new List<Vector2>(_touchPos.Values);
+                    float d1 = pts[0].DistanceTo(pts[1]);
+                    if (_lastPinchDist > 1f && d1 > 1f)
+                        Dist *= Mathf.Clamp(_lastPinchDist / d1, 0.9f, 1.1f);
+                    _lastPinchDist = d1;
+                }
+                else if (drag.Relative.Length() > 4f)
+                {
+                    Yaw -= drag.Relative.X * 0.005f;
+                    Pitch += drag.Relative.Y * 0.004f;
+                }
+                break;
+
+            case InputEventMouseMotion motion when (motion.ButtonMask & MouseButtonMask.Right) != 0:
+                Yaw -= motion.Relative.X * 0.006f;
+                Pitch += motion.Relative.Y * 0.005f;
+                break;
+        }
+    }
+
+    public override void _Input(InputEvent ev)
+    {
+        if (ev is InputEventKey { Pressed: true } key)
+        {
+            if (key.PhysicalKeycode == Key.R && GameOver) Restart();
+            else if (key.PhysicalKeycode == Key.U) Undo();
+        }
+    }
+
+    /// <summary>Screen point → nearest grid point (tests the board plane and the piece-top plane), then acts.</summary>
+    private void TapScreen(Vector2 screenPos)
+    {
+        var origin = Cam.ProjectRayOrigin(screenPos);
+        var dir = Cam.ProjectRayNormal(screenPos);
+        int bestIdx = -1;
+        float bestDist = 1e9f;
+
+        foreach (float planeY in new[] { 0f, 0.45f })
+        {
+            if (Mathf.IsEqualApprox(dir.Y, 0f)) continue;
+            float t = (planeY - origin.Y) / dir.Y;
+            if (t <= 0f) continue;
+            var p = origin + dir * t;
+            int f = Mathf.RoundToInt(p.X / Board.S + 4f);
+            int r = Mathf.RoundToInt(4.5f - p.Z / Board.S);
+            if (f < 0 || f > 8 || r < 0 || r > 9) continue;
+            var wp = Board.WorldOf(r * 9 + f);
+            float d2 = (p.X - wp.X) * (p.X - wp.X) + (p.Z - wp.Z) * (p.Z - wp.Z);
+            if (d2 < 0.36f && t < bestDist) { bestDist = t; bestIdx = r * 9 + f; }
+        }
+        HandleTapIndex(bestIdx);
+    }
+
+    private void HandleTapIndex(int idx)
+    {
+        if (!GameStarted || GameOver || _movingPiece != null) return;
+        if (CurrentMode == Mode.VsAI && Position.Turn == Side.Black) return;
+
+        if (_selected != null && idx >= 0)
+        {
+            int mi = _legalCache.FindIndex(x => x.To == idx);
+            if (mi >= 0)
+            {
+                ExecuteMove(_legalCache[mi]);
+                return;
+            }
+        }
+
+        if (idx >= 0 && Position.Cells[idx] != 0 &&
+            (Position.Cells[idx] > 0) == (Position.Turn == Side.Red))
+            Select(idx);
+        else
+            Deselect();
+    }
+
+    private void Select(int idx)
+    {
+        Deselect();
+        _selected = _pieces.GetValueOrDefault(idx);
+        if (_selected == null) return;
+        _legalCache = Rules.LegalMoves(Position.Cells, Position.Turn);
+        _selected.SetSelected(true);
+        Board.ShowSelection(idx);
+        Board.ShowMoves(_legalCache, idx, Position.Cells);
+    }
+
+    private void Deselect()
+    {
+        if (_selected != null) _selected.SetSelected(false);
+        _selected = null;
+        Board.HideSelection();
+        Board.ClearMoves();
+    }
+
+    // ---- move flow ----
+
+    public void ExecuteMove(Move m)
+    {
+        if (_movingPiece != null) return;
+        Deselect();
+
+        var mover = _pieces.GetValueOrDefault(m.From);
+        if (mover == null) return;
+        _pieces.Remove(m.From);
+
+        Piece victim = _pieces.GetValueOrDefault(m.To);
+        if (victim != null) _pieces.Remove(m.To);
+
+        Position.MakeMove(m);
+        mover.Index = m.To;
+        _pieces[m.To] = mover;
+        Board.ShowLastMove(m);
+
+        if (victim != null)
+        {
+            victim.Alive = false;
+            var w = Board.WorldOf(m.To);
+            var burst = FX.Burst(w + new Vector3(0f, 0.3f, 0f),
+                victim.Side == Side.Red ? new Color(0.85f, 0.3f, 0.2f) : new Color(0.3f, 0.26f, 0.22f));
+            AddChild(burst);
+            var timer = GetTree().CreateTimer(1.2f);
+            timer.Timeout += burst.QueueFree;
+            victim.AnimateCapture(TraySlot(victim));
+        }
+        mover.AnimateMove(Board.WorldOf(m.To), victim != null);
+        _movingPiece = mover;
+    }
+
+    private Vector3 TraySlot(Piece victim)
+    {
+        // red casualties go to the left tray, black to the right; 5 per column, stacked beyond that
+        int n = victim.Side == Side.Red ? _redCaptured++ : _blackCaptured++;
+        float x = victim.Side == Side.Red ? -6.6f : 6.6f;
+        float z = 2.2f - (n % 5) * 1.1f;
+        float y = 0.02f + (n / 5) * 0.55f;
+        return new Vector3(x, y, z);
+    }
+
+    private void FinishMove()
+    {
+        if (Rules.IsGameOver(Position.Cells, Position.Turn, out bool mate, out Side loser))
+        {
+            GameOver = true;
+            Board.ShowCheck(Rules.InCheck(Position.Cells, Position.Turn) ? Rules.FindKing(Position.Cells, Position.Turn) : null);
+            Hud.SetTurn(null, false);
+            Hud.ShowEnd(loser == Side.Red ? Side.Black : Side.Red, mate);
+            return;
+        }
+
+        bool inCheck = Rules.InCheck(Position.Cells, Position.Turn);
+        Board.ShowCheck(inCheck ? Rules.FindKing(Position.Cells, Position.Turn) : null);
+        if (inCheck) Hud.FlashCheck();
+
+        bool aiTurn = CurrentMode == Mode.VsAI && Position.Turn == Side.Black;
+        Hud.SetTurn(Position.Turn, aiTurn);
+        if (aiTurn) StartAI();
+    }
+
+    private void StartAI()
+    {
+        if (_aiTask != null) return;
+        var cells = (int[])Position.Cells.Clone();
+        _aiTask = new System.Threading.Tasks.Task<AI.Result>(() => AI.Search(cells, Position.Turn, 900));
+        _aiTask.Start();
+    }
+
+    // ---- lifecycle ----
+
+    public void ChooseMode(Mode mode)
+    {
+        CurrentMode = mode;
+        GameStarted = true;
+        Hud.SetTurn(Position.Turn, false);
+    }
+
+    public void Restart() => GetTree().ReloadCurrentScene();
+
+    public void Undo()
+    {
+        if (!GameStarted || GameOver || _movingPiece != null || _aiTask != null || Position.History.Count == 0) return;
+        if (_pendingAiMove != null) return;
+
+        int plies = CurrentMode == Mode.VsAI
+            ? (Position.Turn == Side.Red && Position.History.Count >= 2 ? 2 : 1)
+            : 1;
+
+        for (int i = 0; i < plies && Position.History.Count > 0; i++)
+        {
+            var (m, captured) = Position.History[^1];
+            Position.UnmakeMove();
+            var mover = _pieces.GetValueOrDefault(m.To);
+            if (mover != null)
+            {
+                _pieces.Remove(m.To);
+                mover.Index = m.From;
+                _pieces[m.From] = mover;
+                mover.Teleport(Board.WorldOf(m.From));
+            }
+            if (captured != 0)
+            {
+                var victim = AllPieces.Find(p =>
+                    !p.Alive && p.Index == m.To &&
+                    p.Side == (captured > 0 ? Side.Red : Side.Black) &&
+                    p.Type == (PieceType)System.Math.Abs(captured));
+                if (victim != null)
+                {
+                    victim.Alive = true;
+                    victim.Index = m.To;
+                    _pieces[m.To] = victim;
+                    victim.Teleport(Board.WorldOf(m.To));
+                    if (victim.Side == Side.Red) _redCaptured--; else _blackCaptured--;
+                }
+            }
+        }
+
+        Deselect();
+        if (Position.History.Count > 0) Board.ShowLastMove(Position.History[^1].Move);
+        else Board.HideLastMove();
+        Board.ShowCheck(Rules.InCheck(Position.Cells, Position.Turn) ? Rules.FindKing(Position.Cells, Position.Turn) : null);
+        Hud.SetTurn(Position.Turn, false);
+        if (CurrentMode == Mode.VsAI && Position.Turn == Side.Black) StartAI();
+    }
+}
