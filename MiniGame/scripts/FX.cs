@@ -64,7 +64,7 @@ public partial class BlastFx : Node3D
                 AlbedoColor = new Color(1f, 0.85f, 0.45f, 0.7f),
                 EmissionEnabled = true,
                 Emission = new Color(1f, 0.7f, 0.3f),
-                EmissionEnergyMultiplier = 2.5f,
+                EmissionEnergyMultiplier = 3.5f,
                 Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
                 ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
             },

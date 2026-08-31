@@ -224,7 +224,7 @@ public partial class Board : Node3D
             AlbedoColor = new Color(1f, 0.85f, 0.3f, 0.85f),
             EmissionEnabled = true,
             Emission = new Color(1f, 0.8f, 0.2f),
-            EmissionEnergyMultiplier = 1.4f,
+            EmissionEnergyMultiplier = 1.8f,
             Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
             ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
         };
@@ -241,7 +241,7 @@ public partial class Board : Node3D
             AlbedoColor = new Color(1f, 0.2f, 0.15f, 0.9f),
             EmissionEnabled = true,
             Emission = new Color(1f, 0.15f, 0.1f),
-            EmissionEnergyMultiplier = 1.6f,
+            EmissionEnergyMultiplier = 2.0f,
             ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
         };
         _checkRing = new MeshInstance3D
@@ -258,7 +258,7 @@ public partial class Board : Node3D
             AlbedoColor = new Color(0.35f, 0.75f, 1f, 0.8f),
             EmissionEnabled = true,
             Emission = new Color(0.3f, 0.6f, 1f),
-            EmissionEnergyMultiplier = 0.9f,
+            EmissionEnergyMultiplier = 1.2f,
             Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
             ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
         };
@@ -273,7 +273,7 @@ public partial class Board : Node3D
             AlbedoColor = new Color(1f, 0.2f, 0.15f, 0.8f),
             EmissionEnabled = true,
             Emission = new Color(1f, 0.15f, 0.1f),
-            EmissionEnergyMultiplier = 1.6f,
+            EmissionEnergyMultiplier = 2.0f,
             Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
             ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
         };
@@ -407,7 +407,7 @@ public partial class Board : Node3D
             AlbedoColor = new Color(0.4f, 0.9f, 0.4f, 0.85f),
             EmissionEnabled = true,
             Emission = new Color(0.3f, 0.9f, 0.3f),
-            EmissionEnergyMultiplier = 1.2f,
+            EmissionEnergyMultiplier = 1.6f,
             Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
             ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
         };
@@ -416,7 +416,7 @@ public partial class Board : Node3D
             AlbedoColor = new Color(1f, 0.35f, 0.25f, 0.9f),
             EmissionEnabled = true,
             Emission = new Color(1f, 0.3f, 0.2f),
-            EmissionEnergyMultiplier = 1.5f,
+            EmissionEnergyMultiplier = 1.9f,
             ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
         };
         var dotMesh = new CylinderMesh { TopRadius = 0.16f, BottomRadius = 0.16f, Height = 0.02f, Material = dotMat };

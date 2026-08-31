@@ -32,7 +32,7 @@ public partial class Game : Node3D
     private int _redCaptured, _blackCaptured;
 
     // camera orbit
-    public float Yaw, Pitch = 0.95f, Dist = 14.2f;
+    public float Yaw, Pitch = 1.02f, Dist = 14.2f;
     private readonly Vector3 _camTarget = new(0f, 0f, 0.3f);
 
     public override void _Ready()
@@ -60,8 +60,8 @@ public partial class Game : Node3D
     {
         var sky = new ProceduralSkyMaterial
         {
-            SkyTopColor = new Color(0.28f, 0.40f, 0.62f),
-            SkyHorizonColor = new Color(0.82f, 0.72f, 0.56f),
+            SkyTopColor = new Color(0.25f, 0.38f, 0.66f),
+            SkyHorizonColor = new Color(0.74f, 0.81f, 0.90f),
             GroundBottomColor = new Color(0.22f, 0.16f, 0.11f),
         };
         var env = new Environment
@@ -69,7 +69,7 @@ public partial class Game : Node3D
             BackgroundMode = Environment.BGMode.Sky,
             Sky = new Sky { SkyMaterial = sky },
             AmbientLightSource = Environment.AmbientSource.Sky,
-            AmbientLightEnergy = 0.6f,
+            AmbientLightEnergy = 0.5f,
             FogEnabled = true,
             FogLightColor = new Color(0.8f, 0.74f, 0.62f),
             FogDensity = 0.008f,
@@ -77,6 +77,14 @@ public partial class Game : Node3D
             SsaoEnabled = true,
             SsaoIntensity = 2.5f,
             SsaoRadius = 1.2f,
+            SdfgiEnabled = true,
+            SdfgiUseOcclusion = true,
+            SdfgiReadSkyLight = true,
+            SdfgiBounceFeedback = 0.3f,
+            GlowEnabled = true,
+            GlowIntensity = 0.5f,
+            GlowBloom = 0.05f,
+            TonemapMode = Environment.ToneMapper.Filmic,
         };
         AddChild(new WorldEnvironment { Environment = env });
 

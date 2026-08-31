@@ -144,8 +144,8 @@ public partial class Game : Node3D
     {
         var sky = new ProceduralSkyMaterial
         {
-            SkyTopColor = new Color(0.42f, 0.62f, 0.92f),
-            SkyHorizonColor = new Color(0.72f, 0.80f, 0.90f),
+            SkyTopColor = new Color(0.36f, 0.58f, 0.96f),
+            SkyHorizonColor = new Color(0.70f, 0.81f, 0.95f),
             GroundBottomColor = new Color(0.35f, 0.42f, 0.30f),
         };
         var env = new Environment
@@ -159,14 +159,14 @@ public partial class Game : Node3D
             FogDensity = 0.002f,
             FogSkyAffect = 0.35f,
             SsaoEnabled = true,
-            SsaoIntensity = 2.0f,
+            SsaoIntensity = 3.0f,
             SdfgiEnabled = true,
             SdfgiUseOcclusion = true,
             SdfgiReadSkyLight = true,
             SdfgiBounceFeedback = 0.3f,
             GlowEnabled = true,
-            GlowIntensity = 0.6f,
-            GlowBloom = 0.05f,
+            GlowIntensity = 0.85f,
+            GlowBloom = 0.08f,
             TonemapMode = Environment.ToneMapper.Filmic,
         };
         AddChild(new WorldEnvironment { Environment = env });

@@ -282,7 +282,7 @@ public partial class Fortress : Node3D
             AlbedoColor = new Color(c.R, c.G, c.B, 0.42f),
             EmissionEnabled = true,
             Emission = c,
-            EmissionEnergyMultiplier = 1.8f,
+            EmissionEnergyMultiplier = 3.2f,
             Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
             ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
         };

@@ -162,6 +162,7 @@ public partial class Runner : Node3D
         foreach (var f in game.Fortresses)
         {
             if (f.Team != Team || f.Destroyed) continue;
+            if (f.CurrentHp < f.TotalHp * 0.3f) continue; // a collapsing city isn't worth dying for
             foreach (var r in game.Runners)
             {
                 if (r.Team == Team || r.Dead) continue;

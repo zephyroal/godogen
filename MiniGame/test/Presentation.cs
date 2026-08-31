@@ -30,7 +30,7 @@ public partial class Presentation : SceneTree
         void At(float time, System.Action action) => _events.Add(new Ev { Time = time, Action = action });
 
         // sustained attack on the red line: blast off cooldown, weave lanes
-        for (float t = 2f; t <= 60f; t += 2.6f)
+        for (float t = 2f; t <= 74f; t += 2.6f)
         {
             float tt = t;
             At(tt, () => Press("blast"));
@@ -51,15 +51,24 @@ public partial class Presentation : SceneTree
         At(2.0f, () => Snap("01_start"));
         At(20.0f, () => Snap("02_midgame"));
         At(34.0f, () => Snap("03_deep_attack"));
-        // return to defend the home line
+        // turn back: home defense alongside the interception AI
         At(39.5f, () => Press("turn_back"));
         At(39.6f, () => Snap("04_defense_turn"));
         At(41.5f, () => Press("move_left"));
         At(43.0f, () => Press("move_left"));
         At(47.5f, () => Press("move_right"));
         At(51.0f, () => Press("move_left"));
-        At(55.0f, () => Snap("05_final"));
-        At(62.0f, () => Snap("06_end"));
+        // push the red main city to close out the match
+        At(55.5f, () => Press("turn_back")); // face north again
+        At(57.5f, () => Press("dash"));
+        At(59.0f, () => Press("move_right"));
+        At(61.0f, () => Press("move_right"));
+        At(63.0f, () => Press("move_right")); // back onto the red line
+        At(66.0f, () => Press("move_left"));
+        At(68.0f, () => Press("dash"));
+        At(70.0f, () => Press("move_right"));
+        At(72.5f, () => Snap("05_final"));
+        At(78.0f, () => Snap("06_end"));
     }
 
     public override bool _Process(double delta)
