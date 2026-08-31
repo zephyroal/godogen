@@ -1,0 +1,22 @@
+; Engine configuration file.
+config_version=5
+
+[application]
+
+config/name="堡垒冲刺 Fortress Rush"
+run/main_scene="res://scenes/Main.tscn"
+config/features=PackedStringArray("4.7", "C#")
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+
+[dotnet]
+
+project/assembly_name="FortressRush"
+
+[rendering]
+
+lights_and_shadows/directional_shadow/size=4096
+anti_aliasing/quality/msaa_3d=1

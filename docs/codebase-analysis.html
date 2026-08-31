@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Godogen 代码库分析报告</title>
+<style>
+  :root {
+    --bg: #0f1117; --panel: #171a23; --panel2: #1e2230; --border: #2a2f42;
+    --text: #d7dbe8; --muted: #8b93a8; --blue: #5b9dff; --green: #4ecf8d;
+    --red: #ff6b6b; --amber: #ffc857; --purple: #b48cff; --mono: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font: 16px/1.7 "Segoe UI", "Microsoft YaHei", sans-serif; padding: 0 0 80px; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 32px; }
+  header { background: linear-gradient(135deg, #1a1f35 0%, #0f1117 60%); border-bottom: 1px solid var(--border); padding: 56px 0 40px; margin-bottom: 40px; }
+  h1 { font-size: 34px; font-weight: 700; letter-spacing: .5px; }
+  h1 .accent { color: var(--blue); }
+  .subtitle { color: var(--muted); margin-top: 10px; font-size: 15px; }
+  .meta { display: flex; gap: 24px; margin-top: 24px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+  .meta b { color: var(--text); }
+  h2 { font-size: 22px; margin: 48px 0 16px; padding-left: 14px; border-left: 4px solid var(--blue); }
+  h2 .num { color: var(--blue); margin-right: 8px; font-family: var(--mono); font-size: 18px; }
+  h3 { font-size: 17px; margin: 28px 0 10px; color: #fff; }
+  p { margin: 10px 0; color: var(--text); }
+  .muted { color: var(--muted); }
+  code { font-family: var(--mono); font-size: 13.5px; background: #232838; border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; color: #9ecbff; white-space: nowrap; }
+  pre { background: #12151f; border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; overflow-x: auto; margin: 14px 0; font-family: var(--mono); font-size: 13px; line-height: 1.65; }
+  pre code { background: none; border: none; padding: 0; color: #c8d3f0; white-space: pre; }
+  .cmt { color: #6b7390; } .kw { color: #ff9e64; } .str { color: #9ece6a; } .fn { color: #7aa2f7; }
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 14px; }
+  th { background: var(--panel2); text-align: left; padding: 10px 12px; border: 1px solid var(--border); color: #fff; font-weight: 600; white-space: nowrap; }
+  td { padding: 9px 12px; border: 1px solid var(--border); vertical-align: top; }
+  tr:nth-child(even) td { background: #151924; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px; margin: 14px 0; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+  @media (max-width: 800px) { .grid2, .grid3 { grid-template-columns: 1fr; } }
+  .tag { display: inline-block; font-size: 12px; font-family: var(--mono); padding: 2px 10px; border-radius: 20px; margin: 2px 4px 2px 0; border: 1px solid var(--border); }
+  .tag.b { color: var(--blue); border-color: #35507e; background: #17233a; }
+  .tag.g { color: var(--green); border-color: #2c5c45; background: #14261e; }
+  .tag.r { color: var(--red); border-color: #6e3535; background: #2a1717; }
+  .tag.a { color: var(--amber); border-color: #6e5c2c; background: #2a2417; }
+  .tag.p { color: var(--purple); border-color: #5a4385; background: #211a30; }
+  .flow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 14px 0; }
+  .flow .node { background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 16px; font-size: 14px; }
+  .flow .arrow { color: var(--blue); font-family: var(--mono); }
+  .flow .node.hl { border-color: var(--blue); color: var(--blue); }
+  ul, ol { margin: 8px 0 8px 26px; }
+  li { margin: 5px 0; }
+  .warn { background: #2a2017; border: 1px solid #6e5c2c; border-radius: 10px; padding: 14px 18px; margin: 14px 0; }
+  .warn::before { content: "⚠ "; color: var(--amber); }
+  .ok { background: #14261e; border: 1px solid #2c5c45; border-radius: 10px; padding: 14px 18px; margin: 14px 0; }
+  .ok::before { content: "✔ "; color: var(--green); }
+  footer { margin-top: 64px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>Godogen <span class="accent">代码库分析报告</span></h1>
+    <div class="subtitle">面向 Godot / Bevy / Babylon.js 的自主游戏生成器 —— 源仓库深度解析</div>
+    <div class="meta">
+      <span>报告日期 <b>2026-08-31</b></span>
+      <span>仓库 <b>D:\godogen</b></span>
+      <span>类型 <b>提示词/文档源仓库（生成器源码）</b></span>
+      <span>分析工具 <b>Codely CLI</b></span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<!-- ==================== 1. 项目本质 ==================== -->
+<h2><span class="num">01</span>项目本质：不是游戏，是"生成器的源码"</h2>
+<div class="card">
+  <p><b>Godogen 不是游戏，也不是应用程序</b> —— 它是一条自主游戏生成流水线的<b>输入源</b>。其核心模型为：</p>
+  <div class="flow">
+    <span class="node hl">godogen 源仓库<br><span class="muted" style="font-size:12px">manifest + 引擎指南 + asset-gen 技能</span></span>
+    <span class="arrow">──publish.sh──▶</span>
+    <span class="node">游戏运行仓库<br><span class="muted" style="font-size:12px">CLAUDE.md/AGENTS.md + 指南 + 技能</span></span>
+    <span class="arrow">──agent 构建──▶</span>
+    <span class="node hl">游戏本体<br><span class="muted" style="font-size:12px">由 Claude Code / Codex 现场生成</span></span>
+  </div>
+  <p>用户给出一段游戏简报，宿主智能体（Claude Code 或 Codex）在已发布的游戏仓库内自主完成：搭建项目脚手架 → 调用付费 API 生成美术资产 → 运行引擎 → <b>从运行中的游戏验证结果</b>（直播 URL 或 15–20 秒录像），而非仅凭"编译通过"作数。</p>
+  <p class="muted">发布出的运行仓库刻意保持"薄"：只有一份运行时清单、一页引擎指南、一个资产生成技能。项目脚手架、捕获工具等一切其余内容由智能体依据指南现场重建 —— <b>信任模型，不预置脚手架</b>。</p>
+</div>
+
+<!-- ==================== 2. 仓库结构 ==================== -->
+<h2><span class="num">02</span>仓库结构</h2>
+<h3>Git 跟踪的源码树</h3>
+<table>
+  <tr><th style="width:240px">路径</th><th>职责</th></tr>
+  <tr><td><code>prompts/runtime.md</code></td><td><b>运行时清单</b>（引擎无关）。发布时渲染为游戏仓库的 <code>CLAUDE.md</code>（Claude）或 <code>AGENTS.md</code>（Codex）。只固定两件事：持久状态放 <code>README.md</code>（防上下文压缩丢失）、结果必须从运行中的游戏得到证明。</td></tr>
+  <tr><td><code>engines/godot.md</code><br><code>engines/bevy.md</code><br><code>engines/babylon.md</code></td><td><b>每引擎一页指南</b>：技术栈、项目布局、运行/构建门禁、静默失败陷阱、录屏配方。按字面拷贝发布（不做 token 替换）。</td></tr>
+  <tr><td><code>asset-gen/</code></td><td><b>唯一发布的技能</b>：<code>SKILL.md</code>（YAML frontmatter + 用法）、<code>rembg.md</code>（抠图规范）、<code>tools/</code>（Python CLI：图像/视频/GLB/绑骨生成）。</td></tr>
+  <tr><td><code>scripts/render_dir.py</code></td><td>渲染助手：对目录树内所有文本文件做 <code>${KEY}=value</code> token 替换。</td></tr>
+  <tr><td><code>scripts/generate_codex_metadata.py</code></td><td>渲染助手：从 <code>SKILL.md</code> frontmatter 解析生成 Codex 的 <code>agents/openai.yaml</code>。</td></tr>
+  <tr><td><code>publish.sh</code></td><td><b>发布器</b>：按 <code>--engine {godot,bevy,babylon} × --agent {claude,codex}</code> 渲染运行仓库。</td></tr>
+  <tr><td><code>docs/</code></td><td><code>PROJECT.md</code>（设计文档）、<code>demo_prompts.md</code>（演示简报库）、<code>gdscript-vs-csharp.md</code>（语言选型论证）。</td></tr>
+  <tr><td><code>setup.md</code></td><td>工作站安装：.NET 9、Rust、Node 22.12+、Godot .NET 版、系统包、API 密钥。</td></tr>
+  <tr><td><code>AGENTS.md</code></td><td><b>本源仓库的智能体守则</b>（编辑规则，见 §5）。<code>CLAUDE.md</code> 仅是指向它的一行引用。</td></tr>
+  <tr><td><code>CONTRIBUTING.md</code> / <code>CHANGELOG.md</code></td><td>Issue-first 贡献流程 / 设计级变更史（顶部条目记录了 2026-07-02 的"文档化运行时"大瘦身）。</td></tr>
+</table>
+
+<h3>本地未跟踪目录（非源码，不参与发布）</h3>
+<table>
+  <tr><th style="width:240px">目录</th><th>内容</th></tr>
+  <tr><td><code>godot/</code></td><td>Godot 引擎源码完整检出（本地参考用）</td></tr>
+  <tr><td><code>Godot_v4.7.1-stable_mono_win64/</code></td><td>Godot 4.7.1 .NET 版编辑器本地安装</td></tr>
+  <tr><td><code>MiniGame/</code></td><td>游戏简报 + 游戏开发工作区（本报告所在工作区的下一步开发目标）</td></tr>
+</table>
+
+<!-- ==================== 3. 发布流水线 ==================== -->
+<h2><span class="num">03</span>发布流水线（publish.sh）</h2>
+<pre><code><span class="cmt"># 引擎 × 宿主智能体均为发布期渲染选项，而非独立源树</span>
+./publish.sh --engine godot|bevy|babylon --agent claude|codex --out &lt;目录&gt; [--force]</code></pre>
+<div class="card">
+  <ol>
+    <li><b>技能</b>：<code>asset-gen/</code> → <code>&lt;out&gt;/.claude/skills/asset-gen/</code>（Claude）或 <code>&lt;out&gt;/.agents/skills/asset-gen/</code>（Codex），经 <code>render_dir.py</code> 做 token 替换；Codex 额外生成 <code>agents/openai.yaml</code>。</li>
+    <li><b>清单</b>：<code>prompts/runtime.md</code> → <code>&lt;out&gt;/CLAUDE.md</code> 或 <code>AGENTS.md</code>，渲染引擎/智能体 token。</li>
+    <li><b>引擎指南</b>：<code>engines/&lt;engine&gt;.md</code> 按字面拷贝为 <code>&lt;out&gt;/&lt;engine&gt;.md</code>。</li>
+    <li><b>.gitignore</b>（仅目标缺失时生成）+ <code>git init</code> 目标仓库。</li>
+  </ol>
+  <table>
+    <tr><th>渲染 Token</th><th>取值（按目标）</th></tr>
+    <tr><td><code>${ENGINE_NAME}</code> / <code>${ENGINE_GUIDE_FILE}</code></td><td>Godot/Bevy/Babylon.js 与 <code>godot.md/bevy.md/babylon.md</code></td></tr>
+    <tr><td><code>${AGENT_NAME}</code></td><td>Claude 或 Codex</td></tr>
+    <tr><td><code>${ASSET_SKILL_COMMAND}</code></td><td>Claude：<code>/asset-gen</code>；Codex：<code>$asset-gen</code></td></tr>
+    <tr><td><code>${ASSET_GEN_SKILL_DIR}</code></td><td>技能安装后的实际路径</td></tr>
+    <tr><td><code>${RUNTIME_ASSET_DIR}</code></td><td>Babylon 为 <code>src/assets</code>，其余为 <code>assets</code></td></tr>
+  </table>
+</div>
+
+<!-- ==================== 4. 引擎指南 ==================== -->
+<h2><span class="num">04</span>三份引擎指南要点</h2>
+<div class="grid3">
+  <div class="card">
+    <h3>🟦 Godot 4</h3>
+    <span class="tag b">C# / .NET</span><span class="tag b">Jolt</span><span class="tag b">构建期场景生成</span>
+    <ul>
+      <li>所有 C# 类必须 <code>partial</code>；<code>.csproj</code> 版本字段匹配本机工具链</li>
+      <li>场景由 headless <code>SceneTree</code> 脚本一次性生成 <code>.tscn</code>（含 PackAndSave 验证范式）</li>
+      <li>静默陷阱：Owner 链、GLB 递归内联（100MB+ 文件）、<code>SetScript()</code> 释放包装、MultiMesh+GLB、C# 枚举名</li>
+      <li>录屏：<code>--write-movie</code> + <code>--fixed-fps 30</code> + ffmpeg 合成 mp4</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>🦀 Bevy</h3>
+    <span class="tag g">Rust / ECS</span><span class="tag g">离屏捕获</span>
+    <ul>
+      <li>锁定 <code>cargo add bevy</code> 解析出的确切版本；所有 <code>bevy_*</code> 同 minor</li>
+      <li>API 以本机 <code>~/.cargo/registry</code> 内源码为准（版本常新于训练数据）</li>
+      <li>陷阱：glTF jpg 纹理需 <code>features=["jpeg"]</code>、UI 属性在 <code>Node</code> 组件内、程序网格背面剔除</li>
+      <li>录屏：专用离屏二进制 + <code>RenderTarget::Image</code> + 手动时间步</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>🟨 Babylon.js</h3>
+    <span class="tag a">TypeScript / Vite</span><span class="tag a">直播 URL</span>
+    <ul>
+      <li>dev server 绑 <code>0.0.0.0:5173</code> —— 用户实时观看的入口</li>
+      <li>陷阱：副作用导入被 tree-shake 丢弃（编译过、运行时抛错）</li>
+      <li>Havok 物理：<code>HavokPhysics.wasm</code> 从 <code>public/</code> 提供</li>
+      <li>捕获：headless Chrome + 真 GPU（防 SwiftShader 假渲染），等就绪标志后再截图</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ==================== 5. 设计哲学与编辑规则 ==================== -->
+<h2><span class="num">05</span>设计哲学与编辑规则（AGENTS.md，对本仓库有约束力）</h2>
+<div class="grid2">
+  <div class="card">
+    <h3>四大设计支柱</h3>
+    <ul>
+      <li><b>证明胜过宣称</b> —— 以运行中的游戏（录像/URL）为验收标准，编译通过不作数</li>
+      <li><b>信任模型</b> —— 不预置脚手架、不预置规划器；指南只写模型推断不出的东西</li>
+      <li><b>成本感知</b> —— 每次生成前向用户确认花费；资产清单记录路径/尺寸/成本</li>
+      <li><b>一份源多目标</b> —— 引擎与宿主智能体都是同一源树的渲染期选择</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>编辑硬规则</h3>
+    <ul>
+      <li>❌ 禁止在本源仓库创建/维护 <code>.claude/skills/</code> 或 <code>.agents/skills/</code>（发布期产物）</li>
+      <li>❌ 不写"显而易见"的指南 —— 交付物（录像/URL）自会暴露模型的错误</li>
+      <li>✅ 改动/删除功能时，按新设计本来的样子描述，不写过渡说明</li>
+      <li>✅ 贡献：先开 Issue 获批再写码；改动最小化、外科手术式</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ==================== 6. asset-gen ==================== -->
+<h2><span class="num">06</span>asset-gen 资产生成技能</h2>
+<h3>生成后端与成本</h3>
+<table>
+  <tr><th>能力</th><th>后端/模型</th><th>成本</th><th>适用</th></tr>
+  <tr><td>图像</td><td>Gemini（<code>gemini-3.1-flash-image-preview</code>）</td><td>5¢(512) · 7¢(1K) · 10¢(2K) · 15¢(4K)</td><td>精确遵循提示词：参考图、角色、3D 参考</td></tr>
+  <tr><td>图像</td><td>Grok（<code>grok-imagine-image</code>，默认）</td><td>2¢</td><td>质量高但随意：贴图、简单物体、背景</td></tr>
+  <tr><td>视频</td><td>Grok（<code>grok-imagine-video</code>）</td><td>5¢/秒（1–15s, 720p）</td><td>动画精灵帧序列源</td></tr>
+  <tr><td>静态 3D</td><td>Tripo3D 图转模型</td><td>30¢（默认）/ 60¢（HD）</td><td>道具、场景物</td></tr>
+  <tr><td>绑骨 3D</td><td>Tripo3D biped</td><td>网模 + 25¢</td><td>双足角色（非人形自动中止）</td></tr>
+  <tr><td>动画重定向</td><td>Tripo3D 预设（100+ 个 biped 动作）</td><td>10¢/片段</td><td>复用绑骨结果，免重复付费</td></tr>
+</table>
+<div class="warn">关键防坑：<b>绝不</b>提示词要"透明背景"（会画出棋盘格）—— 要纯色背景再用 rembg 抠；Tripo3D 超时<b>不</b>代表失败，任务 id 已存 sidecar，用 <code>resume</code> 免费续接，重新提交会双倍扣费。</div>
+<h3>工具链（asset-gen/tools/）</h3>
+<table>
+  <tr><th style="width:220px">工具</th><th>功能</th></tr>
+  <tr><td><code>asset_gen.py</code></td><td>主 CLI：<code>image</code> / <code>video</code> / <code>glb</code> / <code>rig</code> / <code>retarget</code> / <code>resume</code> 子命令；stdout 输出 JSON 结果（<code>{"ok":true,"path":...,"cost_cents":7}</code>），进度走 stderr</td></tr>
+  <tr><td><code>tripo3d.py</code></td><td>Tripo3D REST 封装：建任务 / 轮询 / 下载 GLB</td></tr>
+  <tr><td><code>grid_slice.py</code></td><td>按网格切分套图（一张 1K 图含多个物件 → 独立精灵）</td></tr>
+  <tr><td><code>find_loop_frame.py</code></td><td>检测循环动画（走/待机）的回环帧，裁掉多余帧</td></tr>
+  <tr><td><code>rembg_matting.py</code></td><td>BiRefNet 多信号抠图，单张/批量，<code>--preview</code> 生成 QA 合成图</td></tr>
+</table>
+<p class="muted">动画精灵配方：参考图（Gemini）→ 姿势（图生图）→ 视频 → ffmpeg 抽帧 → 循环裁剪 → 批量抠图。依赖：<code>xai-sdk</code>、<code>google-genai</code>、<code>rembg</code>、<code>onnxruntime-gpu</code> 等（见 requirements.txt）。</p>
+
+<!-- ==================== 7. 演进史 ==================== -->
+<h2><span class="num">07</span>演进史（CHANGELOG 摘要）</h2>
+<table>
+  <tr><th style="width:130px">日期</th><th>里程碑</th></tr>
+  <tr><td>2026-03-09</td><td>首发：图像生成、3D 转换、截图 QA、视频捕获</td></tr>
+  <tr><td>2026-03-25</td><td>Grok 视频生成 + BiRefNet 抠图重写</td></tr>
+  <tr><td>2026-04-03</td><td>单上下文架构（编排器并入主管线）</td></tr>
+  <tr><td>2026-04-06</td><td>GDScript → C#/.NET 9 大迁移，<code>dotnet build</code> 取代逐文件校验</td></tr>
+  <tr><td>2026-04-14</td><td>Codex 支持（并行发布目标）</td></tr>
+  <tr><td>2026-04-26</td><td>Bevy 支持；树重组为 shared/godot/bevy；弃用 Gemini 外部验证</td></tr>
+  <tr><td>2026-05-18</td><td>Babylon.js 一等公民支持</td></tr>
+  <tr><td><b>2026-07-02</b></td><td><b>文档化运行时</b>：多阶段技能管线 → 薄运行时（单一 manifest + 每引擎一页指南 + 唯一 asset-gen 技能）。砍掉规划器/分解器/架构/脚手架/查找技能/全部钩子 —— 持续"去多余指导"</b></td></tr>
+</table>
+<p class="muted">趋势清晰：随模型能力增强，仓库持续做减法 —— 只保留模型真正无法快速推断或发现的内容。</p>
+
+<!-- ==================== 8. 命令速查 ==================== -->
+<h2><span class="num">08</span>命令与环境速查</h2>
+<pre><code><span class="cmt"># 发布游戏仓库（需 bash + rsync + python3；Ubuntu/Debian/macOS，Windows 需 WSL/Git Bash）</span>
+./publish.sh --engine godot --agent claude --out ~/my-game [--force]
+
+<span class="cmt"># Godot 项目门禁（engines/godot.md）</span>
+dotnet build
+godot --headless --import        <span class="cmt"># 资产变更后</span>
+godot --headless --quit          <span class="cmt"># 健康检查（RID 警告无害）</span>
+
+<span class="cmt"># 证明视频（确定性捕获）</span>
+godot --write-movie screenshots/result/frame.png --fixed-fps 30 --quit-after 450 --script test/Presentation.cs
+ffmpeg -y -framerate 30 -pattern_type glob -i 'screenshots/result/frame*.png' \
+  -c:v libx264 -pix_fmt yuv420p -movflags +faststart screenshots/result/video.mp4</code></pre>
+<table>
+  <tr><th>环境依赖</th><th>说明</th></tr>
+  <tr><td>API 密钥</td><td><code>GOOGLE_API_KEY</code>（Gemini）· <code>XAI_API_KEY</code>（Grok）· <code>TRIPO3D_API_KEY</code>（Tripo3D）—— 均为付费 API</td></tr>
+  <tr><td>引擎工具链</td><td>Godot <b>.NET 版</b> + .NET 9（godot）· Rust/Cargo（bevy）· Node 22.12+（babylon）</td></tr>
+  <tr><td>系统包</td><td>Linux：<code>vulkan-tools xvfb ffmpeg imagemagick</code>；macOS：<code>coreutils ffmpeg dotnet@9</code></td></tr>
+</table>
+
+<!-- ==================== 9. 本机工作区 ==================== -->
+<h2><span class="num">09</span>本机工作区状态（Windows）</h2>
+<div class="ok">
+  已检测到：<b>.NET SDK 10.0.300</b> · <b>Python 3.13.5</b> · <b>Node v22.18.0</b> · <b>Godot 4.7.1 .NET 版</b>（<code>Godot_v4.7.1-stable_mono_win64/</code>，待验证）
+</div>
+<div class="warn">
+  平台注意：仓库脚本面向 Linux/macOS（bash + rsync + xvfb）。Windows 原生环境需跳过 <code>publish.sh</code>（手工搭建游戏仓库布局），录屏用 <code>--write-movie</code>（有显示设备即可，无需 xvfb），ffmpeg 需另行确认。<br>
+  <code>MiniGame/</code> 内已有游戏简报：<b>《堡垒冲刺》</b> —— 2.5D 斜 45° 大方块像素（MC 风）、地铁跑酷式移动、蓝红双阵营各 10 座城池的推塔对抗原型（详见需求分析文档）。
+</div>
+
+<footer>
+  Godogen 代码库分析报告 · 由 Codely CLI 生成于 2026-08-31 · 依据仓库当前工作区状态（HEAD + 未跟踪本地目录）· 本报告存放于 docs/codebase-analysis.html
+</footer>
+</div>
+</body>
+</html>
