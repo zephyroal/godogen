@@ -46,14 +46,28 @@ public partial class Piece : Node3D
         Position = Board.WorldOf(Index);
     }
 
+    private static ImageTexture _redGrain, _blackGrain;
+
     private void BuildBody()
     {
         bool red = Side == Side.Red;
+        int seed = (int)Type * 37 + (red ? 7 : 131) + Index * 5;
+        var rng = new System.Random(seed);
+        float tint = (rng.NextSingle() - 0.5f) * 0.08f;
+        Color woodCol = red ? new Color(0.88f, 0.70f, 0.47f) : new Color(0.72f, 0.56f, 0.36f);
+        woodCol = tint >= 0 ? woodCol.Lightened(tint) : woodCol.Darkened(-tint);
+        var grain = red
+            ? _redGrain ??= FX.WoodGrain(new Color(1f, 1f, 1f), new Color(0.74f, 0.72f, 0.69f), 21, 9f, 128)
+            : _blackGrain ??= FX.WoodGrain(new Color(1f, 1f, 1f), new Color(0.72f, 0.70f, 0.67f), 33, 9f, 128);
         var wood = new StandardMaterial3D
         {
-            AlbedoColor = red ? new Color(0.88f, 0.70f, 0.47f) : new Color(0.74f, 0.58f, 0.38f),
-            Roughness = 0.45f,
+            AlbedoColor = woodCol,
+            AlbedoTexture = grain,
+            Roughness = 0.42f + (rng.NextSingle() - 0.5f) * 0.08f,
             Metallic = 0.05f,
+            ClearcoatEnabled = true,
+            Clearcoat = red ? 0.45f : 0.4f,
+            ClearcoatRoughness = 0.25f,
         };
         var rimMat = new StandardMaterial3D
         {
@@ -95,10 +109,10 @@ public partial class Piece : Node3D
         {
             Text = CharFor(Type, Side),
             Font = font,
-            FontSize = 44,
-            OutlineSize = 6,
-            Modulate = red ? new Color(0.68f, 0.12f, 0.08f) : new Color(0.16f, 0.14f, 0.12f),
-            OutlineModulate = new Color(0.95f, 0.9f, 0.78f),
+            FontSize = 50,
+            OutlineSize = red ? 6 : 8,
+            Modulate = red ? new Color(0.68f, 0.12f, 0.08f) : new Color(0.13f, 0.11f, 0.09f),
+            OutlineModulate = new Color(0.96f, 0.91f, 0.80f),
             Position = new Vector3(0f, 0.53f, 0f),
             RotationDegrees = new Vector3(-90f, 0f, 0f), // flat on the cap, readable from the camera side
             PixelSize = 0.004f,

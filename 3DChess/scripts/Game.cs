@@ -60,36 +60,39 @@ public partial class Game : Node3D
     {
         var sky = new ProceduralSkyMaterial
         {
-            SkyTopColor = new Color(0.35f, 0.45f, 0.62f),
-            SkyHorizonColor = new Color(0.78f, 0.72f, 0.62f),
-            GroundBottomColor = new Color(0.30f, 0.24f, 0.18f),
+            SkyTopColor = new Color(0.28f, 0.40f, 0.62f),
+            SkyHorizonColor = new Color(0.82f, 0.72f, 0.56f),
+            GroundBottomColor = new Color(0.22f, 0.16f, 0.11f),
         };
         var env = new Environment
         {
             BackgroundMode = Environment.BGMode.Sky,
             Sky = new Sky { SkyMaterial = sky },
             AmbientLightSource = Environment.AmbientSource.Sky,
-            AmbientLightEnergy = 1.1f,
+            AmbientLightEnergy = 0.75f,
             FogEnabled = true,
-            FogLightColor = new Color(0.8f, 0.75f, 0.65f),
-            FogDensity = 0.008f,
+            FogLightColor = new Color(0.8f, 0.74f, 0.62f),
+            FogDensity = 0.011f,
+            SsaoEnabled = true,
+            SsaoIntensity = 2.5f,
+            SsaoRadius = 1.2f,
         };
         AddChild(new WorldEnvironment { Environment = env });
 
         var sun = new DirectionalLight3D
         {
             ShadowEnabled = true,
-            LightEnergy = 1.25f,
+            LightEnergy = 1.5f,
             DirectionalShadowMaxDistance = 40f,
         };
         sun.RotationDegrees = new Vector3(-58f, 30f, 0f);
         AddChild(sun);
 
-        var fill = new DirectionalLight3D { LightEnergy = 0.35f, ShadowEnabled = false };
+        var fill = new DirectionalLight3D { LightEnergy = 0.3f, ShadowEnabled = false };
         fill.RotationDegrees = new Vector3(-30f, -140f, 0f);
         AddChild(fill);
 
-        Cam = new Camera3D { Fov = 42f, Near = 0.1f, Far = 100f };
+        Cam = new Camera3D { Fov = 38f, Near = 0.1f, Far = 100f };
         AddChild(Cam);
         Cam.MakeCurrent();
     }
@@ -178,6 +181,11 @@ public partial class Game : Node3D
                 else if (mouse.ButtonIndex == MouseButton.WheelDown) Dist *= 1.08f;
                 break;
 
+            case InputEventMouseMotion hover when hover.ButtonMask == 0:
+                int hi = PickIndex(hover.Position);
+                Board?.ShowHover(hi >= 0 ? hi : null);
+                break;
+
             case InputEventScreenTouch touch:
                 if (touch.Pressed) _touchPos[touch.Index] = touch.Position;
                 else
@@ -221,7 +229,10 @@ public partial class Game : Node3D
     }
 
     /// <summary>Screen point → nearest grid point (tests the board plane and the piece-top plane), then acts.</summary>
-    private void TapScreen(Vector2 screenPos)
+    private void TapScreen(Vector2 screenPos) => HandleTapIndex(PickIndex(screenPos));
+
+    /// <summary>Screen point → nearest grid index within the pick tolerance, or -1.</summary>
+    private int PickIndex(Vector2 screenPos)
     {
         var origin = Cam.ProjectRayOrigin(screenPos);
         var dir = Cam.ProjectRayNormal(screenPos);
@@ -241,7 +252,7 @@ public partial class Game : Node3D
             float d2 = (p.X - wp.X) * (p.X - wp.X) + (p.Z - wp.Z) * (p.Z - wp.Z);
             if (d2 < 0.36f && t < bestDist) { bestDist = t; bestIdx = r * 9 + f; }
         }
-        HandleTapIndex(bestIdx);
+        return bestIdx;
     }
 
     private void HandleTapIndex(int idx)

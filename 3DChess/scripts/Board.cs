@@ -3,7 +3,8 @@ using Godot;
 
 namespace Xiangqi3D;
 
-/// <summary>Wooden xiangqi board: desk, slab, carved lines, palace diagonals, river text, star markers, capture trays, highlight markers.</summary>
+/// <summary>Wooden xiangqi board: desk, slab, carved lines, palace diagonals, river text, star markers,
+/// capture trays, and highlight markers (selection / legal moves / check / last move / hover).</summary>
 public partial class Board : Node3D
 {
     public const float S = 1.0f; // grid spacing
@@ -16,8 +17,9 @@ public partial class Board : Node3D
 
     private readonly List<Node3D> _moveMarks = new();
     private Node3D _selRing, _checkRing, _lastFrom, _lastTo;
-    private MeshInstance3D _illegalMark;
+    private MeshInstance3D _illegalMark, _hoverMark;
     private StandardMaterial3D _illegalMat;
+    private StandardMaterial3D _deskMat, _trayMat;
     private float _pulseT, _illegalT;
 
     public override void _Ready()
@@ -38,26 +40,45 @@ public partial class Board : Node3D
 
     private void BuildDesk()
     {
-        var desk = new MeshInstance3D
+        var tex = FX.WoodGrain(new Color(0.34f, 0.22f, 0.13f), new Color(0.19f, 0.11f, 0.06f), 7, 12f);
+        _deskMat = new StandardMaterial3D
         {
-            Mesh = new BoxMesh { Size = new Vector3(15f, 0.8f, 15.5f), Material = Mat(new Color(0.26f, 0.16f, 0.09f), 0.7f) },
-            Position = new Vector3(0f, -0.55f, 0f),
+            AlbedoTexture = tex,
+            Uv1Scale = new Vector3(3f, 2f, 1f),
+            Roughness = 0.65f,
         };
-        AddChild(desk);
+        _trayMat = new StandardMaterial3D
+        {
+            AlbedoTexture = tex,
+            Uv1Scale = new Vector3(1f, 2f, 1f),
+            Roughness = 0.6f,
+        };
+        AddChild(new MeshInstance3D
+        {
+            Mesh = new BoxMesh { Size = new Vector3(15f, 0.8f, 15.5f), Material = _deskMat },
+            Position = new Vector3(0f, -0.55f, 0f),
+        });
     }
 
     private void BuildSlab()
     {
-        var maple1 = new Color(0.82f, 0.63f, 0.40f);
-        var maple2 = new Color(0.78f, 0.58f, 0.36f);
-        var slab = new MeshInstance3D
+        var grain = FX.WoodGrain(new Color(0.85f, 0.68f, 0.45f), new Color(0.68f, 0.49f, 0.28f), 11, 16f);
+        AddChild(new MeshInstance3D
         {
-            Mesh = new BoxMesh { Size = new Vector3(9.6f, 0.32f, 10.6f), Material = Mat(new Color(0.72f, 0.52f, 0.30f), 0.55f) },
+            Mesh = new BoxMesh
+            {
+                Size = new Vector3(9.6f, 0.32f, 10.6f),
+                Material = new StandardMaterial3D
+                {
+                    AlbedoTexture = grain,
+                    Uv1Scale = new Vector3(2f, 2f, 1f),
+                    Roughness = 0.55f,
+                },
+            },
             Position = new Vector3(0f, -0.16f, 0f),
-        };
-        AddChild(slab);
+        });
 
-        // plank stripes on the playing surface
+        // plank stripes: per-plank tint (vertex color) multiplied over the shared grain
         var stripeMesh = new BoxMesh { Size = new Vector3(S * 0.96f, 0.015f, 10.4f) };
         var mm = new MultiMesh
         {
@@ -70,19 +91,24 @@ public partial class Board : Node3D
         {
             float x = -4f + i * S;
             mm.SetInstanceTransform(i, Transform3D.Identity.Translated(new Vector3(x, -0.005f, 0f)));
-            mm.SetInstanceColor(i, i % 2 == 0 ? maple1 : maple2);
+            mm.SetInstanceColor(i, i % 2 == 0 ? new Color(1f, 1f, 1f) : new Color(0.92f, 0.87f, 0.80f));
         }
         var stripes = new MultiMeshInstance3D { Multimesh = mm, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
-        stripes.MaterialOverride = new StandardMaterial3D { VertexColorUseAsAlbedo = true, Roughness = 0.55f };
+        stripes.MaterialOverride = new StandardMaterial3D
+        {
+            VertexColorUseAsAlbedo = true,
+            AlbedoTexture = grain,
+            Uv1Scale = new Vector3(1f, 3f, 1f),
+            Roughness = 0.5f,
+        };
         AddChild(stripes);
 
-        // raised frame around the slab
-        var frameMat = Mat(new Color(0.45f, 0.29f, 0.15f), 0.5f);
+        // raised frame around the slab, same dark wood as the desk
         foreach (var (w, d, x, z) in new[] { (10.1f, 0.25f, 0f, -5.42f), (10.1f, 0.25f, 0f, 5.42f), (0.25f, 10.6f, -4.92f, 0f), (0.25f, 10.6f, 4.92f, 0f) })
         {
             AddChild(new MeshInstance3D
             {
-                Mesh = new BoxMesh { Size = new Vector3(w, 0.1f, d), Material = frameMat },
+                Mesh = new BoxMesh { Size = new Vector3(w, 0.1f, d), Material = _deskMat },
                 Position = new Vector3(x, -0.05f, z),
             });
         }
@@ -173,20 +199,19 @@ public partial class Board : Node3D
 
     private void BuildTrays()
     {
-        var trayMat = Mat(new Color(0.50f, 0.33f, 0.18f), 0.55f);
         foreach (float sx in new[] { -6.6f, 6.6f })
         {
             var tray = new Node3D { Position = new Vector3(sx, -0.02f, 0f), Name = "Tray" };
             AddChild(tray);
             tray.AddChild(new MeshInstance3D
             {
-                Mesh = new BoxMesh { Size = new Vector3(2.2f, 0.12f, 5.6f), Material = trayMat },
+                Mesh = new BoxMesh { Size = new Vector3(2.2f, 0.12f, 5.6f), Material = _trayMat },
                 Position = new Vector3(0f, -0.06f, 0f),
             });
             foreach (var (w, d, x, z) in new[] { (2.2f, 0.12f, 0f, -2.74f), (2.2f, 0.12f, 0f, 2.74f), (0.12f, 5.6f, -1.04f, 0f), (0.12f, 5.6f, 1.04f, 0f) })
                 tray.AddChild(new MeshInstance3D
                 {
-                    Mesh = new BoxMesh { Size = new Vector3(w, 0.16f, d), Material = trayMat },
+                    Mesh = new BoxMesh { Size = new Vector3(w, 0.16f, d), Material = _trayMat },
                     Position = new Vector3(x, 0.0f, z),
                 });
         }
@@ -227,26 +252,20 @@ public partial class Board : Node3D
         };
         AddChild(_checkRing);
 
+        // last move: corner brackets, far clearer at a glance than small squares
         var lastMat = new StandardMaterial3D
         {
-            AlbedoColor = new Color(0.35f, 0.75f, 1f, 0.55f),
+            AlbedoColor = new Color(0.35f, 0.75f, 1f, 0.8f),
             EmissionEnabled = true,
             Emission = new Color(0.3f, 0.6f, 1f),
-            EmissionEnergyMultiplier = 0.8f,
+            EmissionEnergyMultiplier = 0.9f,
             Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
             ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
         };
-        foreach (var slot in new[] { 0, 1 })
-        {
-            var m = new MeshInstance3D
-            {
-                Mesh = new BoxMesh { Size = new Vector3(0.16f, 0.02f, 0.16f), Material = lastMat },
-                Visible = false,
-                CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
-            };
-            AddChild(m);
-            if (slot == 0) _lastFrom = m; else _lastTo = m;
-        }
+        _lastFrom = MakeBracket(lastMat);
+        _lastTo = MakeBracket(lastMat);
+        AddChild(_lastFrom);
+        AddChild(_lastTo);
 
         // illegal-target flash mark
         _illegalMat = new StandardMaterial3D
@@ -265,6 +284,49 @@ public partial class Board : Node3D
             CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
         };
         AddChild(_illegalMark);
+
+        // desktop hover hint
+        _hoverMark = new MeshInstance3D
+        {
+            Mesh = new CylinderMesh
+            {
+                TopRadius = 0.13f,
+                BottomRadius = 0.13f,
+                Height = 0.02f,
+                Material = new StandardMaterial3D
+                {
+                    AlbedoColor = new Color(1f, 1f, 1f, 0.22f),
+                    Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+                    ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+                },
+            },
+            Visible = false,
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+        };
+        AddChild(_hoverMark);
+    }
+
+    /// <summary>A square of four glowing corner brackets that frame a grid point.</summary>
+    private static Node3D MakeBracket(StandardMaterial3D mat)
+    {
+        var root = new Node3D { Visible = false };
+        const float half = 0.42f, leg = 0.26f, th = 0.055f;
+        foreach (var (sx, sz) in new[] { (-1, -1), (1, -1), (-1, 1), (1, 1) })
+        {
+            root.AddChild(new MeshInstance3D
+            {
+                Mesh = new BoxMesh { Size = new Vector3(leg, 0.014f, th), Material = mat },
+                Position = new Vector3(sx * (half - leg / 2), 0.008f, sz * half),
+                CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+            });
+            root.AddChild(new MeshInstance3D
+            {
+                Mesh = new BoxMesh { Size = new Vector3(th, 0.014f, leg), Material = mat },
+                Position = new Vector3(sx * half, 0.008f, sz * (half - leg / 2)),
+                CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+            });
+        }
+        return root;
     }
 
     /// <summary>Brief red flash on an illegal target.</summary>
@@ -274,6 +336,19 @@ public partial class Board : Node3D
         _illegalMark.Position = new Vector3(w.X, 0.05f, w.Z);
         _illegalMark.Visible = true;
         _illegalT = 0.45f;
+    }
+
+    /// <summary>Faint marker on the grid point under the mouse cursor (desktop only).</summary>
+    public void ShowHover(int? idx)
+    {
+        if (idx == null)
+        {
+            _hoverMark.Visible = false;
+            return;
+        }
+        var w = WorldOf(idx.Value);
+        _hoverMark.Position = new Vector3(w.X, 0.02f, w.Z);
+        _hoverMark.Visible = true;
     }
 
     public override void _Process(double delta)
@@ -316,8 +391,8 @@ public partial class Board : Node3D
 
     public void ShowLastMove(Move m)
     {
-        _lastFrom.Position = new Vector3(WorldOf(m.From).X, 0.008f, WorldOf(m.From).Z);
-        _lastTo.Position = new Vector3(WorldOf(m.To).X, 0.008f, WorldOf(m.To).Z);
+        _lastFrom.Position = new Vector3(WorldOf(m.From).X, 0f, WorldOf(m.From).Z);
+        _lastTo.Position = new Vector3(WorldOf(m.To).X, 0f, WorldOf(m.To).Z);
         _lastFrom.Visible = _lastTo.Visible = true;
     }
 

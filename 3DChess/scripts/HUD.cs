@@ -2,7 +2,8 @@ using Godot;
 
 namespace Xiangqi3D;
 
-/// <summary>CanvasLayer UI: mode selection, turn pill, check flash, end screen, undo/restart buttons. Touch-first sizing.</summary>
+/// <summary>CanvasLayer UI: mode selection, turn pill, check flash, end screen, undo/restart buttons.
+/// Every element is anchor/container laid out so it adapts to any window size; touch-first sizing (buttons ≥72px).</summary>
 public partial class HUD : CanvasLayer
 {
     private Label _turnPill;
@@ -14,9 +15,19 @@ public partial class HUD : CanvasLayer
     public Button BtnTwo { get; private set; }
     private float _checkT;
 
+    // warm lacquer palette matching the wooden board
+    private static readonly Color PanelBg = new(0.13f, 0.08f, 0.05f, 0.92f);
+    private static readonly Color PanelBorder = new(0.55f, 0.42f, 0.24f);
+    private static readonly Color GoldBorder = new(0.85f, 0.68f, 0.38f);
+    private static readonly Color Gold = new(1f, 0.88f, 0.62f);
+    private static readonly Color Cream = new(0.93f, 0.88f, 0.80f);
+    private static readonly Color BtnBg = new(0.21f, 0.13f, 0.08f, 0.95f);
+    private static readonly Color BtnBgHover = new(0.29f, 0.18f, 0.11f, 0.97f);
+    private static readonly Color BtnBgPressed = new(0.15f, 0.09f, 0.06f, 0.97f);
+
     private static SystemFont UiFont() => new() { FontNames = new[] { "Microsoft YaHei", "SimHei", "Segoe UI", "sans-serif" } };
 
-    private static StyleBoxFlat Box(Color fill, Color border, int radius = 14)
+    private static StyleBoxFlat Box(Color fill, Color border, int radius = 12)
     {
         return new StyleBoxFlat
         {
@@ -25,8 +36,18 @@ public partial class HUD : CanvasLayer
             BorderWidthLeft = 2, BorderWidthTop = 2, BorderWidthRight = 2, BorderWidthBottom = 2,
             CornerRadiusTopLeft = radius, CornerRadiusTopRight = radius,
             CornerRadiusBottomLeft = radius, CornerRadiusBottomRight = radius,
-            ContentMarginLeft = 20, ContentMarginRight = 20, ContentMarginTop = 8, ContentMarginBottom = 8,
+            ContentMarginLeft = 22, ContentMarginRight = 22, ContentMarginTop = 10, ContentMarginBottom = 10,
         };
+    }
+
+    /// <summary>Anchor a control to a preset point with pixel offsets — correct at any window size.</summary>
+    private static void Anchor(Control c, Control.LayoutPreset preset, float l, float t, float r, float b)
+    {
+        c.SetAnchorsAndOffsetsPreset(preset);
+        c.OffsetLeft = l;
+        c.OffsetTop = t;
+        c.OffsetRight = r;
+        c.OffsetBottom = b;
     }
 
     private static Label MkLabel(string text, int size, Color color, Godot.HorizontalAlignment halign)
@@ -37,56 +58,72 @@ public partial class HUD : CanvasLayer
         return l;
     }
 
+    private static Label Shadowed(Label l, Color shadow)
+    {
+        l.AddThemeColorOverride("font_shadow_color", shadow);
+        l.AddThemeConstantOverride("shadow_offset_x", 2);
+        l.AddThemeConstantOverride("shadow_offset_y", 2);
+        return l;
+    }
+
     private static Button MkButton(string text, int size)
     {
-        var b = new Button { Text = text, CustomMinimumSize = new Vector2(240f, 84f) };
+        var b = new Button { Text = text, CustomMinimumSize = new Vector2(250f, 84f) };
         b.AddThemeFontOverride("font", UiFont());
         b.AddThemeFontSizeOverride("font_size", size);
-        b.AddThemeStyleboxOverride("normal", Box(new Color(0.16f, 0.2f, 0.3f, 0.95f), new Color(0.5f, 0.6f, 0.8f)));
-        b.AddThemeStyleboxOverride("hover", Box(new Color(0.22f, 0.28f, 0.42f, 0.95f), new Color(0.6f, 0.7f, 0.9f)));
-        b.AddThemeStyleboxOverride("pressed", Box(new Color(0.12f, 0.15f, 0.22f, 0.95f), new Color(0.4f, 0.5f, 0.7f)));
+        b.AddThemeColorOverride("font_color", Cream);
+        b.AddThemeColorOverride("font_hover_color", Gold);
+        b.AddThemeColorOverride("font_pressed_color", Gold);
+        b.AddThemeColorOverride("font_focus_color", Gold);
+        b.AddThemeColorOverride("font_disabled_color", new Color(0.55f, 0.5f, 0.45f));
+        b.AddThemeStyleboxOverride("normal", Box(BtnBg, PanelBorder));
+        b.AddThemeStyleboxOverride("hover", Box(BtnBgHover, GoldBorder));
+        b.AddThemeStyleboxOverride("pressed", Box(BtnBgPressed, new Color(0.45f, 0.34f, 0.2f)));
+        b.AddThemeStyleboxOverride("focus", Box(BtnBgHover, GoldBorder));
         return b;
     }
 
     public override void _Ready()
     {
-        // turn pill (top center)
-        _turnBg = new Panel
-        {
-            Position = new Vector2(490f, 16f),
-            CustomMinimumSize = new Vector2(300f, 46f),
-        };
-        _turnBg.AddThemeStyleboxOverride("panel", Box(new Color(0.08f, 0.08f, 0.1f, 0.85f), new Color(0.35f, 0.35f, 0.4f)));
+        // turn pill (anchored top center)
+        _turnBg = new Panel();
+        Anchor(_turnBg, Control.LayoutPreset.CenterTop, -160f, 14f, 160f, 62f);
+        _turnBg.AddThemeStyleboxOverride("panel", Box(PanelBg, PanelBorder, 22));
         _turnPill = MkLabel("", 24, new Color(1f, 1f, 1f), Godot.HorizontalAlignment.Center);
-        _turnPill.Position = new Vector2(0f, 10f);
-        _turnPill.Size = new Vector2(300f, 30f);
+        _turnPill.VerticalAlignment = VerticalAlignment.Center;
+        _turnPill.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         _turnBg.AddChild(_turnPill);
         AddChild(_turnBg);
         SetTurn(Side.Red, false, 1);
 
-        // check flash
-        _checkFlash = MkLabel("将军！", 52, new Color(1f, 0.25f, 0.2f), Godot.HorizontalAlignment.Center);
-        _checkFlash.Position = new Vector2(0f, 170f);
-        _checkFlash.Size = new Vector2(1280f, 70f);
+        // check flash (upper center)
+        _checkFlash = Shadowed(MkLabel("将军！", 54, new Color(1f, 0.32f, 0.24f), Godot.HorizontalAlignment.Center),
+            new Color(0.2f, 0f, 0f, 0.85f));
+        Anchor(_checkFlash, Control.LayoutPreset.CenterTop, -320f, 150f, 320f, 230f);
         _checkFlash.Visible = false;
         AddChild(_checkFlash);
 
-        // in-game buttons: 悔棋 | 菜单 | 再来一局
+        // in-game buttons: 悔棋 | 菜单 | 再来一局 (anchored bottom row)
         var undo = MkButton("悔棋 (U)", 24);
-        undo.CustomMinimumSize = new Vector2(150f, 70f);
-        undo.Position = new Vector2(28f, 620f);
+        undo.CustomMinimumSize = new Vector2(150f, 74f);
+        Anchor(undo, Control.LayoutPreset.BottomLeft, 24f, -98f, 174f, -24f);
         undo.Pressed += () => Game.Instance?.Undo();
         AddChild(undo);
 
         var menu = MkButton("菜单", 24);
-        menu.CustomMinimumSize = new Vector2(150f, 70f);
-        menu.Position = new Vector2(565f, 620f);
+        menu.CustomMinimumSize = new Vector2(150f, 74f);
+        Anchor(menu, Control.LayoutPreset.CenterBottom, -75f, -98f, 75f, -24f);
+        // ghost style: clearly secondary next to the solid undo/rematch buttons
+        menu.AddThemeStyleboxOverride("normal", Box(new Color(0.1f, 0.06f, 0.04f, 0.55f), new Color(0.4f, 0.31f, 0.19f, 0.75f)));
+        menu.AddThemeStyleboxOverride("hover", Box(new Color(0.2f, 0.12f, 0.07f, 0.82f), GoldBorder));
+        menu.AddThemeStyleboxOverride("pressed", Box(new Color(0.1f, 0.06f, 0.04f, 0.85f), new Color(0.4f, 0.31f, 0.19f)));
+        menu.AddThemeStyleboxOverride("focus", Box(new Color(0.2f, 0.12f, 0.07f, 0.82f), GoldBorder));
         menu.Pressed += () => Game.Instance?.Menu();
         AddChild(menu);
 
         var reset = MkButton("再来一局", 24);
-        reset.CustomMinimumSize = new Vector2(150f, 70f);
-        reset.Position = new Vector2(1102f, 620f);
+        reset.CustomMinimumSize = new Vector2(150f, 74f);
+        Anchor(reset, Control.LayoutPreset.BottomRight, -174f, -98f, -24f, -24f);
         reset.Pressed += () => Game.Instance?.Rematch();
         AddChild(reset);
 
@@ -97,31 +134,35 @@ public partial class HUD : CanvasLayer
     private void BuildStartOverlay()
     {
         _startOverlay = new Control();
-        _startOverlay.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-        var dim = new ColorRect { Color = new Color(0f, 0f, 0f, 0.66f) };
-        dim.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        _startOverlay.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        var dim = new ColorRect { Color = new Color(0f, 0f, 0f, 0.68f) };
+        dim.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         _startOverlay.AddChild(dim);
 
-        var title = MkLabel("3D 中国象棋", 64, new Color(1f, 0.92f, 0.7f), Godot.HorizontalAlignment.Center);
-        title.Position = new Vector2(0f, 150f);
-        title.Size = new Vector2(1280f, 90f);
-        _startOverlay.AddChild(title);
-        var sub = MkLabel("选择对局模式", 26, new Color(0.85f, 0.85f, 0.9f), Godot.HorizontalAlignment.Center);
-        sub.Position = new Vector2(0f, 250f);
-        sub.Size = new Vector2(1280f, 40f);
-        _startOverlay.AddChild(sub);
+        var box = new VBoxContainer();
+        box.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        box.Alignment = BoxContainer.AlignmentMode.Center;
+        box.AddThemeConstantOverride("separation", 26);
+        _startOverlay.AddChild(box);
+
+        var title = Shadowed(MkLabel("3D 中国象棋", 68, Gold, Godot.HorizontalAlignment.Center),
+            new Color(0f, 0f, 0f, 0.75f));
+        title.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter;
+        box.AddChild(title);
+        var sub = MkLabel("选择对局模式", 26, Cream, Godot.HorizontalAlignment.Center);
+        sub.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter;
+        box.AddChild(sub);
 
         BtnVsAI = MkButton("人机对弈（执红先行）", 30);
-        BtnVsAI.Position = new Vector2(430f, 330f);
-        _startOverlay.AddChild(BtnVsAI);
+        BtnVsAI.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter;
+        box.AddChild(BtnVsAI);
         BtnTwo = MkButton("双人对弈（同屏轮流）", 30);
-        BtnTwo.Position = new Vector2(430f, 450f);
-        _startOverlay.AddChild(BtnTwo);
+        BtnTwo.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter;
+        box.AddChild(BtnTwo);
 
-        var hint = MkLabel("单指点选 · 拖动旋转 · 双指缩放", 20, new Color(0.7f, 0.7f, 0.75f), Godot.HorizontalAlignment.Center);
-        hint.Position = new Vector2(0f, 570f);
-        hint.Size = new Vector2(1280f, 30f);
-        _startOverlay.AddChild(hint);
+        var hint = MkLabel("单指点选 · 拖动旋转 · 双指缩放", 20, new Color(0.78f, 0.71f, 0.6f), Godot.HorizontalAlignment.Center);
+        hint.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter;
+        box.AddChild(hint);
 
         BtnVsAI.Pressed += () => { _startOverlay.Visible = false; Game.Instance?.ChooseMode(Game.Mode.VsAI); };
         BtnTwo.Pressed += () => { _startOverlay.Visible = false; Game.Instance?.ChooseMode(Game.Mode.TwoPlayers); };
@@ -131,29 +172,35 @@ public partial class HUD : CanvasLayer
     private void BuildEndOverlay()
     {
         _endOverlay = new Control { Visible = false, MouseFilter = Control.MouseFilterEnum.Ignore };
-        _endOverlay.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-        var dim = new ColorRect { Color = new Color(0f, 0f, 0f, 0.6f) };
-        dim.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        _endOverlay.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        var dim = new ColorRect { Color = new Color(0f, 0f, 0f, 0.62f) };
+        dim.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         _endOverlay.AddChild(dim);
 
-        _endTitle = MkLabel("", 60, new Color(1f, 0.9f, 0.4f), Godot.HorizontalAlignment.Center);
-        _endTitle.Position = new Vector2(0f, 200f);
-        _endTitle.Size = new Vector2(1280f, 80f);
-        _endOverlay.AddChild(_endTitle);
-        _endReason = MkLabel("", 26, new Color(0.9f, 0.9f, 0.95f), Godot.HorizontalAlignment.Center);
-        _endReason.Position = new Vector2(0f, 300f);
-        _endReason.Size = new Vector2(1280f, 40f);
-        _endOverlay.AddChild(_endReason);
+        var box = new VBoxContainer();
+        box.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        box.Alignment = BoxContainer.AlignmentMode.Center;
+        box.AddThemeConstantOverride("separation", 24);
+        _endOverlay.AddChild(box);
 
+        _endTitle = Shadowed(MkLabel("", 62, new Color(1f, 0.9f, 0.45f), Godot.HorizontalAlignment.Center),
+            new Color(0f, 0f, 0f, 0.8f));
+        _endTitle.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter;
+        box.AddChild(_endTitle);
+        _endReason = MkLabel("", 26, Cream, Godot.HorizontalAlignment.Center);
+        _endReason.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter;
+        box.AddChild(_endReason);
+
+        var row = new HBoxContainer();
+        row.AddThemeConstantOverride("separation", 24);
+        row.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter;
         var again = MkButton("再来一局 (R)", 30);
-        again.Position = new Vector2(360f, 390f);
         again.Pressed += () => Game.Instance?.Rematch();
-        _endOverlay.AddChild(again);
-
         var toMenu = MkButton("返回菜单", 26);
-        toMenu.Position = new Vector2(700f, 400f);
         toMenu.Pressed += () => Game.Instance?.Menu();
-        _endOverlay.AddChild(toMenu);
+        row.AddChild(again);
+        row.AddChild(toMenu);
+        box.AddChild(row);
         AddChild(_endOverlay);
     }
 
@@ -180,7 +227,7 @@ public partial class HUD : CanvasLayer
         bool red = turn == Side.Red;
         string text = thinking ? "黑方思考中…" : red ? "红方行棋" : "黑方行棋";
         _turnPill.Text = moveNumber > 0 ? $"第 {moveNumber} 手 · {text}" : text;
-        _turnPill.Modulate = red ? new Color(1f, 0.55f, 0.45f) : new Color(0.75f, 0.85f, 1f);
+        _turnPill.Modulate = red ? new Color(1f, 0.6f, 0.5f) : new Color(0.8f, 0.88f, 1f);
     }
 
     public void FlashCheck()
@@ -193,7 +240,7 @@ public partial class HUD : CanvasLayer
     public void ShowEnd(Side winner, bool checkmate)
     {
         _endTitle.Text = winner == Side.Red ? "红方胜利！" : "黑方胜利！";
-        _endTitle.Modulate = winner == Side.Red ? new Color(1f, 0.5f, 0.4f) : new Color(0.7f, 0.8f, 1f);
+        _endTitle.Modulate = winner == Side.Red ? new Color(1f, 0.5f, 0.4f) : new Color(0.95f, 0.83f, 0.55f);
         _endReason.Text = checkmate ? "绝杀 —— 被将死" : "困毙 —— 无子可动";
         _endOverlay.Visible = true;
     }
