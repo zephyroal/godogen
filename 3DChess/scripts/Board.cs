@@ -55,7 +55,7 @@ public partial class Board : Node3D
         };
         AddChild(new MeshInstance3D
         {
-            Mesh = new BoxMesh { Size = new Vector3(15f, 0.8f, 15.5f), Material = _deskMat },
+            Mesh = new BoxMesh { Size = new Vector3(11.5f, 0.8f, 12.5f), Material = _deskMat },
             Position = new Vector3(0f, -0.55f, 0f),
         });
     }

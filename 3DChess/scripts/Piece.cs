@@ -1,8 +1,10 @@
+using System.Collections.Generic;
 using Godot;
 
 namespace Xiangqi3D;
 
-/// <summary>A turned wooden 3D piece with an engraved character. Handles select/move/capture animations.</summary>
+/// <summary>A turned wooden 3D piece. Loads a GLB model if available; falls back to procedural geometry.
+/// Handles select/move/capture animations.</summary>
 public partial class Piece : Node3D
 {
     public Side Side;
@@ -17,6 +19,36 @@ public partial class Piece : Node3D
     private Vector3 _from, _to;
     private float _arcHeight;
     public bool AnimDone { get; private set; }
+
+    // GLB scene cache: loaded once per (type, side), reused across all instances
+    private static readonly Dictionary<(PieceType, Side), PackedScene> _glbCache = new();
+
+    private static string GlbPath(PieceType t, Side s)
+    {
+        string type = t switch
+        {
+            PieceType.King => "king",
+            PieceType.Advisor => "advisor",
+            PieceType.Elephant => "elephant",
+            PieceType.Horse => "horse",
+            PieceType.Chariot => "chariot",
+            PieceType.Cannon => "cannon",
+            _ => "soldier",
+        };
+        string side = s == Side.Red ? "red" : "black";
+        return $"res://assets/glb/{type}_{side}.glb";
+    }
+
+    private static PackedScene LoadGlb(PieceType t, Side s)
+    {
+        var key = (t, s);
+        if (_glbCache.TryGetValue(key, out var scene)) return scene;
+        string path = GlbPath(t, s);
+        if (!ResourceLoader.Exists(path)) return null;
+        scene = GD.Load<PackedScene>(path);
+        if (scene != null) _glbCache[key] = scene;
+        return scene;
+    }
 
     public static string CharFor(PieceType t, Side s) => s == Side.Red
         ? t switch
@@ -40,34 +72,74 @@ public partial class Piece : Node3D
             _ => "卒",
         };
 
+    // target height per piece type (relative;帅=1.0)
+    private static float TargetHeight(PieceType t) => t switch
+    {
+        PieceType.King => 0.95f,
+        PieceType.Advisor => 0.75f,
+        PieceType.Elephant => 0.80f,
+        PieceType.Horse => 0.85f,
+        PieceType.Chariot => 0.85f,
+        PieceType.Cannon => 0.85f,
+        _ => 0.65f,
+    };
+
     public override void _Ready()
     {
-        BuildBody();
+        var glb = LoadGlb(Type, Side);
+        if (glb != null) BuildFromGlb(glb);
+        else BuildProcedural();
         Position = Board.WorldOf(Index);
     }
 
-    private static ImageTexture _redGrain, _blackGrain;
+    private void BuildFromGlb(PackedScene glb)
+    {
+        var instance = glb.Instantiate<Node3D>();
+        AddChild(instance);
 
-    private void BuildBody()
+        // measure AABB and scale to target size
+        float targetH = TargetHeight(Type) * 1.1f; // world units
+        float targetD = 0.84f; // base diameter fits grid spacing
+
+        var aabb = GetAabb(instance);
+        float h = aabb.Size.Y;
+        float d = Mathf.Max(aabb.Size.X, aabb.Size.Z);
+        float scale = Mathf.Min(targetH / h, targetD / d) * 0.95f;
+        // normalize fallback discs to the same footprint as GLB pieces
+        if (h < 0.01f) scale = targetD / 0.86f; // degenerate AABB — shouldn't happen, but guard
+        instance.Scale = Vector3.One * scale;
+
+        // re-measure after scale and align: bottom at y=0, center on XZ
+        aabb = GetAabb(instance);
+        instance.Position = new Vector3(-aabb.Position.X - aabb.Size.X * 0.5f, -aabb.Position.Y, -aabb.Position.Z - aabb.Size.Z * 0.5f);
+    }
+
+    private static Aabb GetAabb(Node3D root)
+    {
+        Aabb aabb = new Aabb();
+        bool first = true;
+        void Walk(Node n)
+        {
+            if (n is MeshInstance3D mi)
+            {
+                var a = mi.GetAabb();
+                a.Position = mi.GlobalTransform * a.Position;
+                if (first) { aabb = a; first = false; }
+                else aabb = aabb.Merge(a);
+            }
+            foreach (var c in n.GetChildren()) Walk(c);
+        }
+        Walk(root);
+        return aabb;
+    }
+
+    private void BuildProcedural()
     {
         bool red = Side == Side.Red;
-        int seed = (int)Type * 37 + (red ? 7 : 131) + Index * 5;
-        var rng = new System.Random(seed);
-        float tint = (rng.NextSingle() - 0.5f) * 0.08f;
-        Color woodCol = red ? new Color(0.88f, 0.70f, 0.47f) : new Color(0.72f, 0.56f, 0.36f);
-        woodCol = tint >= 0 ? woodCol.Lightened(tint) : woodCol.Darkened(-tint);
-        var grain = red
-            ? _redGrain ??= FX.WoodGrain(new Color(1f, 1f, 1f), new Color(0.74f, 0.72f, 0.69f), 21, 9f, 128)
-            : _blackGrain ??= FX.WoodGrain(new Color(1f, 1f, 1f), new Color(0.72f, 0.70f, 0.67f), 33, 9f, 128);
         var wood = new StandardMaterial3D
         {
-            AlbedoColor = woodCol,
-            AlbedoTexture = grain,
-            Roughness = 0.42f + (rng.NextSingle() - 0.5f) * 0.08f,
-            Metallic = 0.05f,
-            ClearcoatEnabled = true,
-            Clearcoat = red ? 0.45f : 0.4f,
-            ClearcoatRoughness = 0.25f,
+            AlbedoColor = red ? new Color(0.88f, 0.70f, 0.47f) : new Color(0.74f, 0.58f, 0.38f),
+            Roughness = 0.45f,
         };
         var rimMat = new StandardMaterial3D
         {
@@ -75,7 +147,6 @@ public partial class Piece : Node3D
             Roughness = 0.6f,
         };
 
-        // turned profile: wide base → waist ring → shoulder → domed cap
         AddChild(new MeshInstance3D
         {
             Mesh = new CylinderMesh { TopRadius = 0.31f, BottomRadius = 0.43f, Height = 0.10f, Material = wood },
@@ -96,25 +167,24 @@ public partial class Piece : Node3D
             Mesh = new CylinderMesh { TopRadius = 0.27f, BottomRadius = 0.34f, Height = 0.07f, Material = wood },
             Position = new Vector3(0f, 0.335f, 0f),
         });
-        var dome = new MeshInstance3D
+        AddChild(new MeshInstance3D
         {
             Mesh = new SphereMesh { Radius = 0.30f, Height = 0.60f, Material = wood },
             Position = new Vector3(0f, 0.37f, 0f),
             Scale = new Vector3(1f, 0.42f, 1f),
-        };
-        AddChild(dome);
+        });
 
         var font = new SystemFont { FontNames = new[] { "Microsoft YaHei", "SimHei", "Segoe UI", "sans-serif" } };
         var glyph = new Label3D
         {
             Text = CharFor(Type, Side),
             Font = font,
-            FontSize = 50,
-            OutlineSize = red ? 6 : 8,
-            Modulate = red ? new Color(0.68f, 0.12f, 0.08f) : new Color(0.91f, 0.86f, 0.76f),
-            OutlineModulate = red ? new Color(0.96f, 0.91f, 0.80f) : new Color(0.12f, 0.10f, 0.07f),
+            FontSize = 44,
+            OutlineSize = 6,
+            Modulate = red ? new Color(0.68f, 0.12f, 0.08f) : new Color(0.16f, 0.14f, 0.12f),
+            OutlineModulate = new Color(0.95f, 0.9f, 0.78f),
             Position = new Vector3(0f, 0.53f, 0f),
-            RotationDegrees = new Vector3(-90f, 0f, 0f), // flat on the cap, readable from the camera side
+            RotationDegrees = new Vector3(-90f, 0f, 0f),
             PixelSize = 0.004f,
         };
         AddChild(glyph);
@@ -185,7 +255,7 @@ public partial class Piece : Node3D
                     return;
                 }
                 float k = _t;
-                float xz = k; // linear slide
+                float xz = k;
                 float y = Mathf.Sin(Mathf.Pi * k) * _arcHeight;
                 Position = new Vector3(
                     Mathf.Lerp(_from.X, _to.X, xz),

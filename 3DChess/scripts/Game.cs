@@ -32,7 +32,7 @@ public partial class Game : Node3D
     private int _redCaptured, _blackCaptured;
 
     // camera orbit
-    public float Yaw, Pitch = 1.02f, Dist = 14.2f;
+    public float Yaw, Pitch = 0.88f, Dist = 14.2f;
     private readonly Vector3 _camTarget = new(0f, 0f, 0.3f);
 
     public override void _Ready()
@@ -71,9 +71,9 @@ public partial class Game : Node3D
             AmbientLightSource = Environment.AmbientSource.Sky,
             AmbientLightEnergy = 0.5f,
             FogEnabled = true,
-            FogLightColor = new Color(0.8f, 0.74f, 0.62f),
-            FogDensity = 0.008f,
-            FogSkyAffect = 0.35f,
+            FogLightColor = new Color(0.72f, 0.78f, 0.88f),
+            FogDensity = 0.006f,
+            FogSkyAffect = 0.15f,
             SsaoEnabled = true,
             SsaoIntensity = 2.5f,
             SsaoRadius = 1.2f,
@@ -168,7 +168,7 @@ public partial class Game : Node3D
 
     private void UpdateCamera()
     {
-        Pitch = Mathf.Clamp(Pitch, 0.5f, 1.35f);
+        Pitch = Mathf.Clamp(Pitch, 0.45f, 1.35f);
         Dist = Mathf.Clamp(Dist, 7f, 20f);
         var off = new Vector3(
             Mathf.Sin(Yaw) * Mathf.Cos(Pitch),
