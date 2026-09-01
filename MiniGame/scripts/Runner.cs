@@ -438,9 +438,21 @@ public partial class Runner : Node3D
         if (charGlb != null)
         {
             _useGlbChar = true;
-            // tint the character mesh with team color
-            TintRecursive(charGlb, c);
             _body.AddChild(charGlb);
+            // team-color ground ring under the character (keeps GLB textures intact)
+            var ring = new MeshInstance3D
+            {
+                Mesh = new CylinderMesh { TopRadius = 0.8f, BottomRadius = 1.0f, Height = 0.1f, RadialSegments = 16 },
+                MaterialOverride = new StandardMaterial3D
+                {
+                    AlbedoColor = new Color(c.R, c.G, c.B, 0.5f),
+                    EmissionEnabled = true, Emission = c, EmissionEnergyMultiplier = 1.2f,
+                    Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+                    ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+                },
+                Position = new Vector3(0f, 0.05f, 0f),
+            };
+            _body.AddChild(ring);
         }
         else
         {
@@ -506,19 +518,6 @@ public partial class Runner : Node3D
             Font = new SystemFont { FontNames = new[] { "Microsoft YaHei", "SimHei", "Segoe UI", "sans-serif" } },
         };
         AddChild(_tag);
-    }
-
-    /// <summary>Recursively tint all MeshInstance3D children with a team-color override.</summary>
-    private static void TintRecursive(Node node, Color c)
-    {
-        if (node is MeshInstance3D mi && mi.MaterialOverride == null)
-            mi.MaterialOverride = new StandardMaterial3D
-            {
-                AlbedoColor = new Color(c.R * 0.7f + 0.3f, c.G * 0.7f + 0.3f, c.B * 0.7f + 0.3f),
-                Roughness = 0.7f,
-            };
-        foreach (var child in node.GetChildren())
-            if (child is Node n) TintRecursive(n, c);
     }
 
     private void Animate(float dt)
