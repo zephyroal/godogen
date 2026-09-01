@@ -35,8 +35,8 @@ public partial class Game : Node3D
     /// <summary>Six lanes flanking a central road. Blue side = 0..2 (x&lt;0), Red side = 3..5 (x&gt;0).</summary>
     public static readonly float[] LaneX = { -16f, -10.5f, -5f, 5f, 10.5f, 16f };
 
-    public static readonly Color Blue = new(0.25f, 0.46f, 0.95f);
-    public static readonly Color Red = new(0.93f, 0.30f, 0.27f);
+    public static readonly Color Blue = new(0.10f, 0.38f, 1.0f);
+    public static readonly Color Red = new(0.95f, 0.25f, 0.22f);
 
     public static Game Instance { get; private set; }
 
@@ -144,8 +144,8 @@ public partial class Game : Node3D
     {
         var sky = new ProceduralSkyMaterial
         {
-            SkyTopColor = new Color(0.36f, 0.58f, 0.96f),
-            SkyHorizonColor = new Color(0.70f, 0.81f, 0.95f),
+            SkyTopColor = new Color(0.12f, 0.38f, 0.90f),
+            SkyHorizonColor = new Color(0.58f, 0.72f, 0.92f),
             GroundBottomColor = new Color(0.35f, 0.42f, 0.30f),
         };
         var env = new Environment

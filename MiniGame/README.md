@@ -39,11 +39,12 @@
 | M1 世界与城池 | 地面、灯光、相机、20 座城池生成（复杂度分层）、编号+血量标牌 | ✅ |
 | M2 玩家跑酷 | MC 方块人、自动奔跑/变道/掉头、撞墙停滞、镜头跟随 | ✅ |
 | M3 战斗系统 | 爆破/冲刺技能、方块破坏粒子、城池血量/摧毁/废墟、死亡复活 | ✅ |
-| M4 AI 阵营 | 红方 3 名进攻 AI、蓝方 2 名队友 AI（跨线进攻/扫城/遭遇战/过冲折返） | ✅ |
+| M4 AI 阵营 | 红方 3 名进攻 AI、蓝方 2 名队友 AI（跨线进攻/扫城/遭遇战/过冲折返/回防拦截） | ✅ |
 | M5 HUD 与流程 | 城池计数、技能冷却、摧毁播报、复活倒计时、胜负结算、重开 | ✅ |
 | M6 验证证明 | headless 检查、逻辑探针、50s 证明视频（含终局结算）回看通过 | ✅ |
 | M7 概念图对齐 | 追尾相机、中央公路+虚线、塔楼垛口/发光城门/主城金冠、拔河计分条、路侧树木岩石、两端营地 | ✅ |
 | M8 3D 模型接入 | GLB 主城堡（10 号城中央）/瞭望塔（门前）/路侧松树；AABB 量尺缩放、脚底对齐、缺文件回退；主城核心护甲补偿 | ✅ |
+| M9 玩法与终局表现 | AI 队友回防拦截（同时防守自家）、核心水晶受击闪光、城池摧毁震屏、10 号主城 keep 崩塌动画、终局环绕镜头 | ✅ |
 
 ## 概念图还原（视觉方向）
 
@@ -89,20 +90,20 @@ godot .                            # 运行游戏（或直接开编辑器）
 # 逻辑探针（无渲染，每5秒打印战况，验证 AI 攻城/胜负判定）
 godot --headless --script test/SimProbe.cs
 
-# 证明视频（确定性捕获：完整比赛弧线 ~46s + 结算画面）
-godot --write-movie screenshots/result/frame.png --fixed-fps 30 --quit-after 1950 --script test/Presentation.cs
-ffmpeg -y -framerate 30 -start_number 0 -i "screenshots/result/frame%08d.png" -frames:v 1580 \
+# 证明视频（确定性捕获：完整比赛弧线 ~90s + 主城崩塌 + 终局环绕镜头）
+godot --write-movie screenshots/result/frame.png --fixed-fps 30 --quit-after 2700 --script test/Presentation.cs
+ffmpeg -y -framerate 30 -start_number 0 -i "screenshots/result/frame%08d.png" -frames:v 2700 \
   -c:v libx264 -pix_fmt yuv420p -movflags +faststart screenshots/result/video.mp4
 ```
 
 > 引擎路径：`D:\godogen\Godot_v4.7.1-stable_mono_win64\Godot_v4.7.1-stable_mono_win64_console.exe`（Windows 本机）。
-> 证明产物：`screenshots/result/video.mp4`（~53s）+ `screenshots/01..06_*.png` 关键帧。
+> 证明产物：`screenshots/result/video.mp4`（~90s）+ `screenshots/01..06_*.png` 关键帧。
 > ffmpeg（winget 版）不支持 `-pattern_type glob`，用 `frame%08d.png` 序号模式；Windows 环境无需 xvfb。
 > 3D 模型：需求与提示词见 [3DModelRequirements.md](3DModel/3DModelRequirements.md)（已生成并接入；GLB 缺失时游戏自动回退程序化方块，可正常运行）。
 
 ## 已知设计取舍
 
-- 结算列表按数字排序（蓝1→蓝10）；比赛节奏 ~45-60s（原型速度，可调 `Fortress.cs` 中方块血量）
-- AI 会在过冲整座城池纵深后折返扫荡；玩家死亡就近复活于己方最近完好城池
+- 结算列表按数字排序（蓝1→蓝10）；比赛节奏 ~80-90s（防守 AI 使双方推进均放缓，可调 `Fortress.cs` 中方块血量或 `Runner.cs` 中回防阈值）
+- AI 队友会回防拦截（己方完好城池血量 >30% 时，距离最近的一名 AI 折返拦截敌方深入者）；玩家死亡就近复活于己方最近完好城池
 - 装饰 GLB 无碰撞（玩法不依赖物理）：主城 keep 立于城池中央、脚下墙体格让位，核心水晶 +500 护甲补偿其占用的墙体血量；角色穿行模型属预期表现
 - 无音频（godogen 运行时不带音频管线）；方块人保持程序化（人形骨骼动画生成不可用，见 3DModelRequirements.md #4）
