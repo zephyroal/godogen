@@ -26,3 +26,6 @@ project/assembly_name="FortressRush"
 [rendering]
 
 anti_aliasing/quality/msaa_3d=2
+lights_and_shadows/directional_shadow/size=4096
+environment/defaults/lighting/assert_omni_light=true
+environment/defaults/lighting/assert_spot_light=true

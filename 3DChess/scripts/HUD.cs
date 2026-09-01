@@ -137,41 +137,47 @@ public partial class HUD : CanvasLayer
     {
         _startOverlay = new Control();
         _startOverlay.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        _startOverlay.MouseFilter = Control.MouseFilterEnum.Stop;
         var dim = new ColorRect { Color = new Color(0f, 0f, 0f, 0.68f) };
         dim.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         _startOverlay.AddChild(dim);
 
-        var box = new VBoxContainer();
-        box.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
-        box.Alignment = BoxContainer.AlignmentMode.Center;
-        box.AddThemeConstantOverride("separation", 26);
-        _startOverlay.AddChild(box);
-
+        // Title (center-top area, well above buttons)
         var title = Shadowed(MkLabel("3D 中国象棋", 68, Gold, Godot.HorizontalAlignment.Center),
             new Color(0f, 0f, 0f, 0.75f));
-        title.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter;
-        box.AddChild(title);
+        Anchor(title, Control.LayoutPreset.CenterTop, -400f, 80f, 400f, 170f);
+        _startOverlay.AddChild(title);
+
         var sub = MkLabel("选择对局模式", 26, Cream, Godot.HorizontalAlignment.Center);
-        sub.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter;
-        box.AddChild(sub);
+        Anchor(sub, Control.LayoutPreset.CenterTop, -300f, 185f, 300f, 225f);
+        _startOverlay.AddChild(sub);
 
-        BtnVsAI = MkButton("人机对弈（执红先行）", 30);
-        BtnVsAI.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter;
-        box.AddChild(BtnVsAI);
-        BtnTwo = MkButton("双人对弈（同屏轮流）", 30);
-        BtnTwo.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter;
-        box.AddChild(BtnTwo);
+        // Three buttons: absolute-positioned, equal size, centered vertically
+        float btnW = 300f, btnH = 72f, gap = 16f;
+        float startY = 270f;
 
+        BtnVsAI = MkButton("人机对弈（执红先行）", 26);
+        BtnVsAI.CustomMinimumSize = new Vector2(btnW, btnH);
+        Anchor(BtnVsAI, Control.LayoutPreset.CenterTop, -btnW / 2f, startY, btnW / 2f, startY + btnH);
+        _startOverlay.AddChild(BtnVsAI);
+
+        BtnTwo = MkButton("双人对弈（同屏轮流）", 26);
+        BtnTwo.CustomMinimumSize = new Vector2(btnW, btnH);
+        Anchor(BtnTwo, Control.LayoutPreset.CenterTop, -btnW / 2f, startY + btnH + gap, btnW / 2f, startY + 2 * btnH + gap);
+        _startOverlay.AddChild(BtnTwo);
+
+        var btnOnline = MkButton("联机对战", 26);
+        btnOnline.CustomMinimumSize = new Vector2(btnW, btnH);
+        Anchor(btnOnline, Control.LayoutPreset.CenterTop, -btnW / 2f, startY + 2 * (btnH + gap), btnW / 2f, startY + 3 * btnH + 2 * gap);
+        _startOverlay.AddChild(btnOnline);
+
+        // Hint text (bottom center)
         var hint = MkLabel("单指点选 · 拖动旋转 · 双指缩放", 20, new Color(0.78f, 0.71f, 0.6f), Godot.HorizontalAlignment.Center);
-        hint.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter;
-        box.AddChild(hint);
+        Anchor(hint, Control.LayoutPreset.CenterBottom, -300f, -50f, 300f, -20f);
+        _startOverlay.AddChild(hint);
 
         BtnVsAI.Pressed += () => { UIAnimator.FadeOut(_startOverlay, 0.2f, true); Game.Instance?.ChooseMode(Game.Mode.VsAI); };
         BtnTwo.Pressed += () => { UIAnimator.FadeOut(_startOverlay, 0.2f, true); Game.Instance?.ChooseMode(Game.Mode.TwoPlayers); };
-
-        var btnOnline = MkButton("联机对战", 30);
-        btnOnline.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter;
-        box.AddChild(btnOnline);
 
         var netPanel = new NetworkPanel { Visible = false };
         _startOverlay.AddChild(netPanel);
@@ -179,7 +185,7 @@ public partial class HUD : CanvasLayer
 
         btnOnline.Pressed += () => { netPanel.Visible = true; UIAnimator.FadeIn(netPanel, 0.2f); };
 
-        // staggered slide+fade entrance
+        // staggered fade-in entrance (alpha-only)
         UIAnimator.StaggerIn(new Control[] { title, sub, BtnVsAI, BtnTwo, btnOnline, hint }, 0.08f, 0.35f);
 
         AddChild(_startOverlay);
@@ -221,6 +227,7 @@ public partial class HUD : CanvasLayer
     }
 
     public void HideStart() => _startOverlay.Visible = false;
+    public bool IsStartVisible => _startOverlay?.Visible ?? false;
 
     public override void _Process(double delta)
     {

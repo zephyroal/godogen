@@ -80,22 +80,19 @@ public static class UIAnimator
         return tw;
     }
 
-    /// <summary>Stagger a list of controls: fade+slide each with increasing delay.</summary>
+    /// <summary>Stagger a list of controls: fade each in with increasing delay.
+    /// Safe inside containers (VBoxContainer/HBoxContainer) — only animates alpha, never touches position.</summary>
     public static void StaggerIn(Control[] controls, float delayPer = 0.08f, float duration = 0.3f)
     {
         for (int i = 0; i < controls.Length; i++)
         {
             var c = controls[i];
             c.Modulate = new Color(c.Modulate, 0f);
-            c.Position += new Vector2(0, 30f);
-            var tw = c.CreateTween().SetParallel(true);
-            var t1 = tw.TweenProperty(c, "position:y", c.Position.Y - 30f, duration)
-                .SetTrans(Tween.TransitionType.Cubic)
-                .SetEase(Tween.EaseType.Out);
-            var t2 = tw.TweenProperty(c, "modulate:a", 1f, duration)
+            var tw = c.CreateTween();
+            tw.TweenProperty(c, "modulate:a", 1f, duration)
                 .SetTrans(Tween.TransitionType.Sine)
-                .SetEase(Tween.EaseType.InOut);
-            if (i > 0) { t1.SetDelay(delayPer * i); t2.SetDelay(delayPer * i); }
+                .SetEase(Tween.EaseType.InOut)
+                .SetDelay(delayPer * i);
         }
     }
 }

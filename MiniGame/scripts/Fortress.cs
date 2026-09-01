@@ -97,8 +97,8 @@ public partial class Fortress : Node3D
 		{
 			Position = new Vector3(Game.LaneX[baseLane + 1], 2.2f, coreZ),
 			LightColor = coreColor,
-			LightEnergy = 1.8f,
-			OmniRange = 6f,
+			LightEnergy = 3f,
+			OmniRange = 8f,
 			OmniAttenuation = 1.2f,
 			ShadowEnabled = false,
 		});
@@ -318,8 +318,8 @@ public partial class Fortress : Node3D
         {
             Position = new Vector3(roadX, height * 0.5f, gateZ),
             LightColor = c,
-            LightEnergy = 2.5f,
-            OmniRange = 8f,
+            LightEnergy = 4f,
+            OmniRange = 10f,
             OmniAttenuation = 1.5f,
             ShadowEnabled = false,
         });

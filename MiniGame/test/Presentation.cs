@@ -29,6 +29,9 @@ public partial class Presentation : SceneTree
 
         void At(float time, System.Action action) => _events.Add(new Ev { Time = time, Action = action });
 
+        // bypass the start overlay so gameplay begins immediately
+        At(0.1f, () => { Game.Instance.Hud.SetStart(); });
+
         // sustained blast spam on cooldown for the whole arc
         for (float t = 2f; t <= 76f; t += 2.6f)
         {

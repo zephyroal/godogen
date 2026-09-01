@@ -184,7 +184,7 @@ public partial class Game : Node3D
             BackgroundMode = Environment.BGMode.Sky,
             Sky = new Sky { SkyMaterial = sky },
             AmbientLightSource = Environment.AmbientSource.Sky,
-            AmbientLightEnergy = 0.55f,
+            AmbientLightEnergy = 0.25f,
             FogEnabled = true,
             FogLightColor = new Color(0.75f, 0.80f, 0.90f),
             FogDensity = 0.001f,

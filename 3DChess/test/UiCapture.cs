@@ -16,7 +16,7 @@ public partial class UiCapture : SceneTree
     public override bool _Process(double delta)
     {
         _t += (float)delta;
-        if (_t >= 0.5f && _t < 0.6f)
+        if (_t >= 2.0f && _t < 2.1f)
         {
             var img = Root.GetTexture().GetImage();
             img.SavePng("res://screenshots/ui_start_menu.png");
