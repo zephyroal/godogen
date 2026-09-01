@@ -338,7 +338,7 @@ public partial class Game : Node3D
         var pole = new BoxMesh { Size = new Vector3(0.28f, 7f, 0.28f), Material = poleMat };
         var crate = new BoxMesh { Size = new Vector3(1.2f, 1.2f, 1.2f), Material = crateMat };
 
-        foreach (var (team, cx, cz) in new[] { (Team.Blue, -10.5f, SpawnZ + 6f), (Team.Red, 10.5f, -(SpawnZ + 6f)) })
+        foreach (var (team, cx, cz) in new[] { (Team.Blue, -10.5f, SpawnZ + 6f), (Team.Red, 10.5f, SpawnZ + 6f) })
         {
             var c = ColorOf(team);
             var g = new Node3D { Position = new Vector3(cx, 0f, cz) };
@@ -373,11 +373,12 @@ public partial class Game : Node3D
         for (int idx = 1; idx <= FortressCount; idx++)
         {
             float depth = 9f + 1.2f * idx;
+            // Blue and red fortresses face each other across the road at the same Z
             var blueFort = new Fortress(Team.Blue, idx, z, z + depth, Rng);
             AddChild(blueFort);
             Fortresses.Add(blueFort);
 
-            var redFort = new Fortress(Team.Red, idx, -z, -(z + depth), Rng);
+            var redFort = new Fortress(Team.Red, idx, z, z + depth, Rng);
             AddChild(redFort);
             Fortresses.Add(redFort);
 
@@ -392,12 +393,12 @@ public partial class Game : Node3D
         {
             var r = new Runner(t, isPlayer: player);
             r.TargetLane = lane;
-            r.Position = new Vector3(Game.LaneX[lane], 0f,
-                (t == Team.Blue ? Game.FrontlineSpawnZ : -Game.FrontlineSpawnZ) + zOff);
+            r.Position = new Vector3(Game.LaneX[lane], 0f, Game.FrontlineSpawnZ + zOff);
             AddChild(r);
             Runners.Add(r);
             return r;
         }
+        // both teams spawn at the south end (+Z), running north side by side
         Player = Spawn(Team.Blue, true, 1, 0f);
         Spawn(Team.Blue, false, 0, 3f);
         Spawn(Team.Blue, false, 2, -3f);
@@ -436,7 +437,7 @@ public partial class Game : Node3D
     }
 
     public static int LaneBase(Team t) => t == Team.Blue ? 0 : 3;
-    public static int Heading(Team t) => t == Team.Blue ? -1 : 1;
+    public static int Heading(Team t) => -1; // both teams run north (same direction, per concept art)
     public static Team EnemyOf(Team t) => t == Team.Blue ? Team.Red : Team.Blue;
     public static Color ColorOf(Team t) => t == Team.Blue ? Blue : Red;
 
@@ -452,7 +453,7 @@ public partial class Game : Node3D
             if (d < bestD) { bestD = d; best = f; }
         }
         if (best != null) return best.RespawnPoint();
-        return new Vector3(LaneX[LaneBase(r.Team) + 1], 0f, r.Team == Team.Blue ? SpawnZ : -SpawnZ);
+        return new Vector3(LaneX[LaneBase(r.Team) + 1], 0f, SpawnZ);
     }
 
     // ---- combat plumbing ----

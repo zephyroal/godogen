@@ -32,13 +32,12 @@ public partial class Runner : Node3D
     {
         Team = team;
         IsPlayer = isPlayer;
-        Heading = Game.Heading(team);
+        Heading = Game.Heading(team); // -1 for both teams (same direction)
         MaxHp = isPlayer ? Game.PlayerHp : Game.AiHp;
         Hp = MaxHp;
-        // 阶段1出生位：己方1号城池后方（前期交火位）
         int lane = Game.LaneBase(team) + 1;
         TargetLane = lane;
-        Position = new Vector3(Game.LaneX[lane], 0f, team == Team.Blue ? Game.FrontlineSpawnZ : -Game.FrontlineSpawnZ);
+        Position = new Vector3(Game.LaneX[lane], 0f, Game.FrontlineSpawnZ); // both spawn at +Z
     }
 
     public override void _Ready()
@@ -93,21 +92,35 @@ public partial class Runner : Node3D
 
         if (TryDefend(game)) return; // home defense overrides the attack push
 
-        // stay on the enemy side: attackers belong on the enemy lane column
-        int enemyBase = Game.LaneBase(Game.EnemyOf(Team));
-        if (TargetLane < enemyBase || TargetLane >= enemyBase + 3)
-            TargetLane = enemyBase + 1;
-
         // retarget: enemy's lowest-index intact fortress
         Fortress target = null;
         foreach (var f in game.Fortresses)
             if (f.Team != Team && !f.Destroyed && (target == null || f.Index < target.Index))
                 target = f;
+
+        int ownBase = Game.LaneBase(Team);
+        int enemyBase = Game.LaneBase(Game.EnemyOf(Team));
+
         if (target != null)
         {
-            // turn around only after fully sweeping past the fortress, not at its center
-            bool overshot = Heading < 0 ? Position.Z < target.ZMin - 4f : Position.Z > target.ZMax + 4f;
-            if (overshot) Heading = (int)Mathf.Sign(target.CenterZ - Position.Z);
+            // cross to enemy lanes only when within reach of the target fortress
+            if (Mathf.Abs(Position.Z - target.CenterZ) < 14f)
+            {
+                if (TargetLane < enemyBase || TargetLane >= enemyBase + 3)
+                    TargetLane = enemyBase + 1;
+                SteerToBlocks(target);
+            }
+            else
+            {
+                // transit on own side to avoid own walls
+                if (TargetLane < ownBase || TargetLane >= ownBase + 3)
+                    TargetLane = ownBase + 1;
+            }
+
+            // turn back after fully sweeping past the fortress
+            bool overshot = Position.Z < target.ZMin - 4f;
+            if (overshot) Heading = 1; // head south to finish sweeping
+            else Heading = -1; // keep pushing north
         }
 
         // engagement: ram a nearby enemy runner

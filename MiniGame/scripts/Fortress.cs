@@ -50,7 +50,7 @@ public partial class Fortress : Node3D
         int rows = Mathf.Max(2, Mathf.CeilToInt((ZMax - ZMin) / Game.BlockSize) - 1);
         int baseLane = Game.LaneBase(Team);
 
-        float zFront = Team == Team.Blue ? ZMin : ZMax; // edge facing the enemy (toward map center)
+        float zFront = ZMax; // approach side: both teams come from +Z (south)
 
         // the #10 main city grows a GLB castle keep at its center — wall cells under its footprint make way
         Vector3 keepHalf = Index == Game.FortressCount
@@ -168,7 +168,7 @@ public partial class Fortress : Node3D
         _sign = new Label3D
         {
             Text = SignText(),
-            Position = new Vector3(Game.LaneX[baseLane + 1], 10.5f, zFront + (Team == Team.Blue ? -1.5f : 1.5f)),
+            Position = new Vector3(Game.LaneX[baseLane + 1], 10.5f, zFront + 1.5f),
             Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
             NoDepthTest = true,
             FontSize = 64,
@@ -190,7 +190,7 @@ public partial class Fortress : Node3D
     {
         var rng = Game.Instance?.Rng;
         float y = 1.5f + level * Game.BlockSize;
-        MakeBlock(Game.LaneX[laneIdx], y, z, WallMat(rng), hp: 50f, laneIdx: laneIdx, isCore: false);
+        MakeBlock(Game.LaneX[laneIdx], y, z, WallMat(rng), hp: 70f, laneIdx: laneIdx, isCore: false);
     }
 
     private Block MakeBlock(float x, float y, float z, StandardMaterial3D mat, float hp, int laneIdx, bool isCore)
@@ -228,8 +228,8 @@ public partial class Fortress : Node3D
     private string CastlePath() => $"res://assets/glb/castle_{(Team == Team.Blue ? "blue" : "red")}.glb";
     private string TowerPath() => $"res://assets/glb/tower_{(Team == Team.Blue ? "blue" : "red")}.glb";
 
-    /// <summary>Yaw that turns a GLB's -Z gate toward the enemy (blue faces -Z, red faces +Z).</summary>
-    private float EnemyFacingYaw() => Team == Team.Blue ? 0f : 180f;
+    /// <summary>Yaw that turns a GLB's -Z gate toward the road (blue faces +X, red faces -X).</summary>
+    private float EnemyFacingYaw() => Team == Team.Blue ? 270f : 90f;
 
     private StandardMaterial3D WallMat(System.Random rng)
     {
@@ -259,22 +259,26 @@ public partial class Fortress : Node3D
         };
     }
 
-    /// <summary>Glowing portal frame at the fortress gate (decorative, never blocks the lane).</summary>
+    /// <summary>Glowing portal frame at the road-facing side of the fortress (decorative, never blocks lanes).</summary>
     private void BuildGate(float zFront, int baseLane)
     {
         var c = Game.ColorOf(Team);
-        float gateX = Game.LaneX[baseLane + 1];
-        float gateZ = zFront + (Team == Team.Blue ? -1.8f : 1.8f);
+        float gateZ = CenterZ;
         float height = Index == Game.FortressCount ? 5.6f : 4.4f;
+
+        // gate sits at the road-facing edge; posts span Z, portal panel faces the road
+        float roadX = Team == Team.Blue
+            ? Game.LaneX[baseLane + 2] + 2f   // just outside the inner blue lane, toward road
+            : Game.LaneX[baseLane] - 2f;       // just outside the inner red lane, toward road
 
         var frameMat = new StandardMaterial3D { AlbedoColor = c.Darkened(0.25f), Roughness = 0.9f };
         var post = new BoxMesh { Size = new Vector3(0.8f, height, 0.8f), Material = frameMat };
         foreach (float off in new[] { -2.4f, 2.4f })
-            AddChild(new MeshInstance3D { Mesh = post, Position = new Vector3(gateX + off, height * 0.5f, gateZ) });
+            AddChild(new MeshInstance3D { Mesh = post, Position = new Vector3(roadX, height * 0.5f, gateZ + off) });
         AddChild(new MeshInstance3D
         {
-            Mesh = new BoxMesh { Size = new Vector3(5.6f, 0.8f, 0.8f), Material = frameMat },
-            Position = new Vector3(gateX, height, gateZ),
+            Mesh = new BoxMesh { Size = new Vector3(0.8f, 0.8f, 5.6f), Material = frameMat },
+            Position = new Vector3(roadX, height, gateZ),
         });
 
         var glowMat = new StandardMaterial3D
@@ -288,8 +292,8 @@ public partial class Fortress : Node3D
         };
         AddChild(new MeshInstance3D
         {
-            Mesh = new BoxMesh { Size = new Vector3(4f, height - 0.6f, 0.22f), Material = glowMat },
-            Position = new Vector3(gateX, (height - 0.6f) * 0.5f, gateZ),
+            Mesh = new BoxMesh { Size = new Vector3(0.22f, height - 0.6f, 4f), Material = glowMat },
+            Position = new Vector3(roadX, (height - 0.6f) * 0.5f, gateZ),
         });
     }
 
@@ -399,9 +403,8 @@ public partial class Fortress : Node3D
 
     public Vector3 RespawnPoint()
     {
-        int heading = Game.Heading(Team);
-        float zFront = heading < 0 ? ZMin - 2.5f : ZMax + 2.5f;
-        return new Vector3(Game.LaneX[Game.LaneBase(Team) + 1], 0f, zFront);
+        // respawn south of the fortress (approach side, +Z), where runners come from
+        return new Vector3(Game.LaneX[Game.LaneBase(Team) + 1], 0f, ZMax + 2.5f);
     }
 
     private void RefreshSign()
