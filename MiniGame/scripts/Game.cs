@@ -28,12 +28,12 @@ public partial class Game : Node3D
     public const int AiHp = 90;
     public const int FortressCount = 10;
     public const float CastleHeight = 12f; // GLB keep at the #10 main city
-    public const float TowerHeight = 6f;   // GLB watchtowers at fortress gates
-    public const float TreeHeight = 5f;    // GLB roadside pines
+    public const float TowerHeight = 10f;  // GLB watchtowers — taller than compound walls
+    public const float TreeHeight = 6f;    // GLB roadside pines — ~2.5x character height
     public const float FrontlineSpawnZ = 20f; // 阶段1：出生在己方1号城池后方的前期交火位
 
     /// <summary>Six lanes flanking a central road. Blue side = 0..2 (x&lt;0), Red side = 3..5 (x&gt;0).</summary>
-    public static readonly float[] LaneX = { -16f, -10.5f, -5f, 5f, 10.5f, 16f };
+    public static readonly float[] LaneX = { -12f, -8f, -4f, 4f, 8f, 12f };
 
     public static readonly Color Blue = new(0.10f, 0.38f, 1.0f);
     public static readonly Color Red = new(0.95f, 0.25f, 0.22f);
@@ -42,7 +42,8 @@ public partial class Game : Node3D
 
     public readonly List<Fortress> Fortresses = new();
     public readonly List<Runner> Runners = new();
-    public readonly System.Random Rng = new(42);
+    public readonly System.Random Rng = new(42);        // gameplay stream: fortress layouts, combat rolls, camera shake
+    public readonly System.Random SceneryRng = new(42); // scenery-only stream, so baking the world never shifts gameplay RNG
     public Runner Player { get; private set; }
     public HUD Hud { get; private set; }
     public float SpawnZ { get; private set; }
@@ -79,14 +80,32 @@ public partial class Game : Node3D
     public override void _Ready()
     {
         Instance = this;
-        BuildEnvironment();
-        BuildGround();
+        if (HasNode("World"))
+        {
+            LinkBakedWorld();
+            GD.Print("[Game] 使用烘焙场景 scenes/World.tscn");
+        }
+        else
+        {
+            GD.Print("[Game] 未找到 World 节点，运行时构建世界");
+            BuildEnvironment();
+            BuildGround();
+        }
         BuildFortresses();
         SpawnRunners();
         Hud = new HUD { Name = "HUD" };
         AddChild(Hud);
         PrePositionCamera();
         Hud.Announce("摧毁红方 10 号终极主城即可获胜！", 4f);
+
+        bool bake = false;
+        foreach (var a in OS.GetCmdlineUserArgs()) bake |= a == "--bake";
+        foreach (var a in OS.GetCmdlineArgs()) bake |= a == "--bake";
+        if (bake)
+        {
+            BakeStaticWorld();
+            GetTree().Quit(0);
+        }
     }
 
     public override void _Process(double delta)
@@ -175,6 +194,7 @@ public partial class Game : Node3D
         // warm key light with soft shadows
         _sun = new DirectionalLight3D
         {
+            Name = "Sun",
             ShadowEnabled = true,
             LightEnergy = 1.25f,
             LightColor = new Color(1f, 0.96f, 0.88f),
@@ -186,6 +206,7 @@ public partial class Game : Node3D
         // cool back fill for shape modeling (shadowless)
         var fill = new DirectionalLight3D
         {
+            Name = "Fill",
             ShadowEnabled = false,
             LightEnergy = 0.25f,
             LightColor = new Color(0.7f, 0.8f, 1.0f),
@@ -195,6 +216,7 @@ public partial class Game : Node3D
 
         _cam = new Camera3D
         {
+            Name = "Camera",
             Projection = Camera3D.ProjectionType.Perspective,
             Fov = 55f,
             Near = 0.5f,
@@ -204,12 +226,63 @@ public partial class Game : Node3D
         _cam.MakeCurrent();
     }
 
+    /// <summary>Static environment baked into scenes/World.tscn: relink the runtime handles instead of rebuilding.</summary>
+    private void LinkBakedWorld()
+    {
+        _cam = GetNode<Camera3D>("World/Camera");
+        _sun = GetNode<DirectionalLight3D>("World/Sun");
+        _cam.MakeCurrent();
+    }
+
+    /// <summary>
+    /// Move the runtime-built static environment under a "World" node and save it to scenes/World.tscn.
+    /// One-shot bake: run with `++ --bake`, then instance World.tscn inside Main.tscn; _Ready skips the builders.
+    /// Must run windowed (a real renderer) — the headless dummy renderer no-ops MultiMesh instance writes.
+    /// Re-bake by deleting scenes/World.tscn and removing the World node from Main.tscn first.
+    /// </summary>
+    private void BakeStaticWorld()
+    {
+        if (HasNode("World"))
+        {
+            GD.Print("[Bake] Main.tscn 已包含 World 实例——请先删除 scenes/World.tscn 并移除 Main.tscn 中的 World 节点再重新烘焙");
+            return;
+        }
+        var world = new Node3D { Name = "World" };
+        AddChild(world);
+        var moving = new List<Node>();
+        foreach (Node child in GetChildren())
+            if (child != world && child is not Fortress && child is not Runner && child is not HUD)
+                moving.Add(child);
+        foreach (Node child in moving)
+        {
+            RemoveChild(child);
+            world.AddChild(child);
+        }
+        // Pack() only serializes nodes whose Owner is inside the packed tree
+        foreach (Node child in moving)
+            ClaimForPack(child, world);
+        var ps = new PackedScene();
+        Error err = ps.Pack(world);
+        if (err == Error.Ok) err = ResourceSaver.Save(ps, "res://scenes/World.tscn");
+        GD.Print(err == Error.Ok ? "[Bake] 已生成 scenes/World.tscn" : $"[Bake] 失败：{err}");
+    }
+
+    /// <summary>Recursively claim nodes for baking; instanced scene roots (GLB models) are claimed
+    /// but not descended into, so each model packs as a compact instance reference.</summary>
+    private static void ClaimForPack(Node node, Node owner)
+    {
+        node.Owner = owner;
+        if (node.SceneFilePath.Length != 0) return;
+        foreach (Node child in node.GetChildren())
+            ClaimForPack(child, owner);
+    }
+
     private void BuildGround()
     {
         var mesh = new BoxMesh { Size = new Vector3(BlockSize, 1f, BlockSize) };
         mesh.Material = new StandardMaterial3D { VertexColorUseAsAlbedo = true, Roughness = 1f };
 
-        int nx = 18, nz = 144; // x in [-25.5, 25.5], z in [-214.5, 214.5]
+        int nx = 14, nz = 144; // x in [-19.5, 19.5], z in [-214.5, 214.5]
         var mm = new MultiMesh
         {
             TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
@@ -233,7 +306,7 @@ public partial class Game : Node3D
                 Color c;
                 if (Mathf.Abs(z) > 188f) c = stone;
                 else if (Mathf.Abs(x) <= 1.8f) c = (iz + ix) % 2 == 0 ? road1 : road2;
-                else if (Mathf.Abs(x) > 19.5f) c = dirt;
+                else if (Mathf.Abs(x) > 15.5f) c = dirt;
                 else c = (iz + ix) % 2 == 0 ? grass1 : grass2;
                 mm.SetInstanceTransform(i, Transform3D.Identity.Translated(new Vector3(x, -0.5f, z)));
                 mm.SetInstanceColor(i, c);
@@ -305,6 +378,7 @@ public partial class Game : Node3D
     /// <summary>Trees and rocks along the outer strips, flanking the battlefield (concept art scenery).</summary>
     private void BuildScenery()
     {
+        var rng = SceneryRng;
         var trunkMat = new StandardMaterial3D { AlbedoColor = new Color(0.42f, 0.30f, 0.19f), Roughness = 1f };
         var leafMat1 = new StandardMaterial3D { AlbedoColor = new Color(0.16f, 0.42f, 0.20f), Roughness = 1f };
         var leafMat2 = new StandardMaterial3D { AlbedoColor = new Color(0.22f, 0.48f, 0.24f), Roughness = 1f };
@@ -316,10 +390,10 @@ public partial class Game : Node3D
         for (int t = 0; t < 44; t++)
         {
             float side = t % 2 == 0 ? 1f : -1f;
-            float x = side * (20.5f + (float)Rng.NextDouble() * 4.5f);
-            float z = -180f + (float)Rng.NextDouble() * 360f;
-            float s = 0.8f + (float)Rng.NextDouble() * 0.6f;
-            float yaw = (float)Rng.NextDouble() * 360f;
+            float x = side * (15.5f + (float)rng.NextDouble() * 3f);
+            float z = -180f + (float)rng.NextDouble() * 360f;
+            float s = 0.8f + (float)rng.NextDouble() * 0.6f;
+            float yaw = (float)rng.NextDouble() * 360f;
 
             var tree = Glb.Create(treePath, TreeHeight);
             if (tree != null)
@@ -347,14 +421,14 @@ public partial class Game : Node3D
         for (int r = 0; r < 18; r++)
         {
             float side = r % 2 == 0 ? 1f : -1f;
-            float x = side * (19.8f + (float)Rng.NextDouble() * 5f);
-            float z = -180f + (float)Rng.NextDouble() * 360f;
+            float x = side * (14.8f + (float)rng.NextDouble() * 4f);
+            float z = -180f + (float)rng.NextDouble() * 360f;
             var rock = new MeshInstance3D
             {
                 Mesh = rockMesh,
                 Position = new Vector3(x, 0.35f, z),
-                RotationDegrees = new Vector3(0f, (float)Rng.NextDouble() * 90f, 0f),
-                Scale = Vector3.One * (0.7f + (float)Rng.NextDouble() * 0.8f),
+                RotationDegrees = new Vector3(0f, (float)rng.NextDouble() * 90f, 0f),
+                Scale = Vector3.One * (0.7f + (float)rng.NextDouble() * 0.8f),
             };
             AddChild(rock);
         }
@@ -373,10 +447,10 @@ public partial class Game : Node3D
         for (int t = 0; t < 12; t++)
         {
             float side = t % 2 == 0 ? 1f : -1f;
-            float x = side * (21f + (float)Rng.NextDouble() * 4f);
-            float z = -170f + (float)Rng.NextDouble() * 340f;
-            float s = 0.9f + (float)Rng.NextDouble() * 0.5f;
-            float yaw = (float)Rng.NextDouble() * 360f;
+            float x = side * (16f + (float)rng.NextDouble() * 3f);
+            float z = -170f + (float)rng.NextDouble() * 340f;
+            float s = 0.9f + (float)rng.NextDouble() * 0.5f;
+            float yaw = (float)rng.NextDouble() * 360f;
 
             var blTree = Glb.Create(broadleafPath, TreeHeight);
             if (blTree != null)
@@ -402,15 +476,15 @@ public partial class Game : Node3D
         for (int b = 0; b < 20; b++)
         {
             float side = b % 2 == 0 ? 1f : -1f;
-            float x = side * (18f + (float)Rng.NextDouble() * 6f);
-            float z = -170f + (float)Rng.NextDouble() * 340f;
-            float s = 0.6f + (float)Rng.NextDouble() * 0.6f;
+            float x = side * (13.5f + (float)rng.NextDouble() * 5f);
+            float z = -170f + (float)rng.NextDouble() * 340f;
+            float s = 0.6f + (float)rng.NextDouble() * 0.6f;
 
             var bush = Glb.Create(bushPath, 1.5f);
             if (bush != null)
             {
                 bush.Position = new Vector3(x, 0f, z);
-                bush.RotationDegrees = new Vector3(0f, (float)Rng.NextDouble() * 360f, 0f);
+                bush.RotationDegrees = new Vector3(0f, (float)rng.NextDouble() * 360f, 0f);
                 bush.Scale = Vector3.One * s;
                 AddChild(bush);
             }
