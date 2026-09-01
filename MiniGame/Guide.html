@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>堡垒冲刺 Fortress Rush — 架构与操作指南</title>
+<style>
+  body { font-family: "Segoe UI", "Microsoft YaHei", sans-serif; max-width: 960px; margin: 2rem auto; padding: 0 1rem; line-height: 1.7; color: #222; }
+  h1 { border-bottom: 3px solid #2a5cdf; padding-bottom: .3rem; }
+  h2 { border-bottom: 1px solid #ddd; margin-top: 2.5rem; }
+  h3 { color: #2a5cdf; margin-top: 1.8rem; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+  th, td { border: 1px solid #ccc; padding: .5rem .8rem; text-align: left; }
+  th { background: #f0f4ff; }
+  tr:nth-child(even) { background: #f9f9f9; }
+  code { background: #f0f0f0; padding: .15rem .4rem; border-radius: 3px; font-size: .9em; }
+  pre { background: #1e1e2e; color: #cdd6f4; padding: 1rem; border-radius: 8px; overflow-x: auto; }
+  pre code { background: none; color: inherit; }
+  .note { background: #fffbe6; border-left: 4px solid #faad14; padding: .8rem 1.2rem; margin: 1rem 0; border-radius: 4px; }
+  .tip { background: #f6ffed; border-left: 4px solid #52c41a; padding: .8rem 1.2rem; margin: 1rem 0; border-radius: 4px; }
+  .warn { background: #fff2f0; border-left: 4px solid #ff4d4f; padding: .8rem 1.2rem; margin: 1rem 0; border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<h1>🏰 堡垒冲刺 Fortress Rush — 架构与操作指南</h1>
+
+<p>2.5D 体素风格·地铁跑酷式移动·双阵营推塔对抗原型 · Godot 4.7.1 .NET (C#)</p>
+
+<hr>
+
+<h2>📋 快速操作（双击 .bat 即可）</h2>
+
+<p>项目根目录 <code>D:\godogen\MiniGame\</code> 下提供以下快捷脚本：</p>
+
+<table>
+<tr><th>脚本</th><th>功能</th><th>说明</th></tr>
+<tr><td><code>open_editor.bat</code></td><td>打开 Godot 编辑器</td><td>加载当前项目，可直接编辑场景、调试运行</td></tr>
+<tr><td><code>build.bat</code></td><td>编译 C# + 导入资源</td><td><code>dotnet build</code> + <code>godot --headless --import</code></td></tr>
+<tr><td><code>run_game.bat</code></td><td>直接运行游戏</td><td>先 build 再启动窗口模式，跳过编辑器</td></tr>
+<tr><td><code>sim_probe.bat</code></td><td>逻辑探针</td><td>无渲染跑一局 AI vs AI，每 5s 打印战况</td></tr>
+<tr><td><code>record_video.bat</code></td><td>录制证明视频</td><td>确定性捕获 90s 帧序列 + ffmpeg 编码 mp4</td></tr>
+<tr><td><code>export_web.bat</code></td><td>导出 Web 版</td><td>生成可部署的 HTML5 WebGL 构建</td></tr>
+</table>
+
+<h2>🎮 如何用编辑器打开场景</h2>
+
+<h3>方法一：双击 <code>open_editor.bat</code></h3>
+<p>自动打开 Godot 编辑器并加载 <code>MiniGame</code> 项目。</p>
+
+<h3>方法二：命令行</h3>
+<pre><code>cd D:\godogen\MiniGame
+"D:\godogen\Godot_v4.7.1-stable_mono_win64\Godot_v4.7.1-stable_mono_win64_console.exe" --editor .</code></pre>
+
+<div class="note">
+<strong>注意</strong>：必须使用 <strong>mono 版</strong> Godot（<code>Godot_v4.7.1-stable_mono_win64.exe</code>），普通版不支持 C#。
+</div>
+
+<h3>编辑器内操作</h3>
+<ol>
+<li>左侧 <strong>文件系统</strong> → <code>res://scenes/Main.tscn</code> 双击打开场景</li>
+<li><code>Main.tscn</code> 只是一个根节点（挂了 <code>Game.cs</code> 脚本），世界在运行时由 C# 代码动态构建</li>
+<li>按 <strong>F5</strong>（或▶按钮）运行游戏</li>
+<li>按 <strong>F6</strong> 运行当前场景（跳过主场景选择）</li>
+<li>修改 <code>scripts/*.cs</code> 后，编辑器会自动检测并重新编译</li>
+</ol>
+
+<h2>🔨 如何编译游戏</h2>
+
+<h3>方法一：双击 <code>build.bat</code></h3>
+<p>执行两步：C# 编译 + Godot 资源导入。</p>
+
+<h3>方法二：命令行</h3>
+<pre><code>cd D:\godogen\MiniGame
+
+# 1. 编译 C# 程序集（生成 bin/Debug/net8.0/FortressRush.dll）
+dotnet build
+
+# 2. 导入 GLB/贴图等资源（首次或新增资产后必须执行）
+"D:\godogen\Godot_v4.7.1-stable_mono_win64\Godot_v4.7.1-stable_mono_win64_console.exe" --headless --import
+
+# 3. 运行游戏
+"D:\godogen\Godot_v4.7.1-stable_mono_win64\Godot_v4.7.1-stable_mono_win64_console.exe" .</code></pre>
+
+<div class="tip">
+<strong>工具链版本</strong>：Godot 4.7.1 stable mono · .NET SDK 10.0.300 (net8.0 target)
+</div>
+
+<h2>🌐 如何导出 Web 版</h2>
+
+<h3>前置准备</h3>
+<ol>
+<li>在 Godot 编辑器中，菜单 <strong>Editor → Manage Export Templates</strong></li>
+<li>下载 <strong>Web (HTML5)</strong> 导出模板（约 ~50MB）</li>
+</ol>
+
+<h3>方法一：双击 <code>export_web.bat</code></h3>
+<p>自动导出 Web 版到 <code>export/web/</code> 目录。</p>
+
+<h3>方法二：命令行</h3>
+<pre><code>cd D:\godogen\MiniGame
+
+# 先确保 C# 已编译
+dotnet build
+
+# 导出 Web 版（需要已下载导出模板）
+"D:\godogen\Godot_v4.7.1-stable_mono_win64\Godot_v4.7.1-stable_mono_win64_console.exe" \
+  --headless --export-release "Web" export/web/index.html</code></pre>
+
+<div class="warn">
+<strong>注意</strong>：首次导出前必须在编辑器中配置 Export Preset。<br>
+菜单 <strong>Project → Export → Add → Web (HTML5)</strong>，保存即可（默认配置可用）。<br>
+Web 导出需要 <strong>threads: off</strong>（C# 在 Web 端不支持多线程）和 <strong>extension: on</strong>。
+</div>
+
+<h3>本地预览 Web 版</h3>
+<pre><code>cd D:\godogen\MiniGame\export\web
+python -m http.server 8080
+# 浏览器打开 http://localhost:8080</code></pre>
+
+<hr>
+
+<h2>🏗️ 代码架构</h2>
+
+<h3>目录结构</h3>
+<pre><code>MiniGame/
+├── project.godot              # Godot 项目配置（引擎版本、入口场景、显示设置）
+├── FortressRush.csproj        # .NET 项目文件（SDK 引用、目标框架）
+├── scenes/
+│   ├── Main.tscn             # 唯一场景（根节点挂 Game.cs，运行时动态构建世界）
+│   └── BuildMain.cs          # 构建期场景生成器（headless 运行→输出 .tscn）
+├── scripts/                   # 运行时 C# 代码
+│   ├── Game.cs                # 游戏根节点：世界构建、相机、游戏流程
+│   ├── Fortress.cs            # 城池：迷宫方块、围墙 compound、核心水晶、崩塌动画
+│   ├── Runner.cs              # 角色：跑酷移动、爆破/冲刺技能、AI 逻辑、回防拦截
+│   ├── Block.cs               # 可破坏方块（城墙/核心水晶的基类）
+│   ├── HUD.cs                 # UI 层：拔河计分条、血量、技能冷却、结算屏
+│   ├── FX.cs                  # 特效系统：爆炸光球、激光束、冲击波、冲刺残影
+│   └── Glb.cs                 # GLB 模型加载器（AABB 测量、缩放对齐、缺失回退）
+├── assets/glb/                # GLB 3D 模型 + PBR 贴图
+├── test/                      # 测试与捕获脚本
+│   ├── SimProbe.cs            # 逻辑探针（headless，AI vs AI，每 5s 报告战况）
+│   ├── Presentation.cs        # 证明视频捕获（确定性输入时间线→帧序列）
+│   ├── ModelPreview.cs        # GLB 朝向预览（4 向截图）
+│   └── FxProbe.cs             # 特效验证探针
+├── screenshots/               # 截图与视频输出（gitignored）
+├── 3DModel/                   # 3D 模型需求与差距分析文档
+└── README.md                  # 项目说明
+</code></pre>
+
+<h3>核心类关系</h3>
+<pre><code>Game (Node3D)  ← 根节点，挂在 Main.tscn 上
+├── WorldEnvironment / DirectionalLight3D / Camera3D    ← 环境 & 相机
+├── MultiMeshInstance3D (地面棋盘)                       ← 程序化地形
+├── Fortress × 20 (Node3D)                               ← 蓝红各 10 座城池
+│   ├── Block × N (MeshInstance3D)                       ← 可破坏方块（墙/核心）
+│   ├── GLB compound / castle / tower                    ← 建筑模型
+│   └── Label3D                                          ← 编号+血条标牌
+├── Runner × 6 (Node3D)                                  ← 1 玩家 + 5 AI
+│   └── MeshInstance3D × 6                               ← 方块人身体部件
+├── HUD (CanvasLayer)                                    ← UI 覆盖层
+└── FX 节点（BlastFx / LaserFx / HitSparkFx / DashTrailFx）← 临时特效</code></pre>
+
+<h3>运行时流程</h3>
+<pre><code>Game._Ready()
+  ├── BuildEnvironment()        # 天空盒、灯光、相机
+  ├── BuildGround()             # 地面棋盘 + 公路标线 + 路标 + 金币 + 远景城堡
+  │   ├── BuildScenery()        # 松树(GLB) + 阔叶树(GLB) + 灌木(GLB) + 岩石
+  │   ├── BuildCoins()          # 公路金币(GLB)
+  │   ├── BuildCamps()         # 两端营地（石台+旗杆+GLB spawn_pen）
+  │   └── BuildLandmarkCastle() # 远端 castle_terminal 地标(GLB)
+  ├── BuildFortresses()         # 20 座城池（蓝左红右，同 Z 对峙）
+  │   └── Fortress.Build()      # 每座城池：
+  │       ├── 方块迷宫墙        #   可破坏 Block（hp=20）
+  │       ├── 核心水晶          #   发光 Block（受击闪光）
+  │       ├── BuildGate()      #   发光城门光幕
+  │       ├── BuildWalls()     #   GLB compound 围墙
+  │       ├── GLB watchtower × 2  # 门前瞭望塔
+  │       └── GLB castle keep  #   1号城+10号城放城堡模型
+  ├── SpawnRunners()           # 6 名角色（2蓝AI+3红AI+1玩家）从南端出生
+  └── HUD                      # UI 初始化
+
+Game._Process(delta)           # 每帧：
+  ├── 追尾相机跟随玩家          #   平滑 lerp + 震屏
+  ├── Runner._Process()        #   自动奔跑 + 变道 + 技能 + AI
+  ├── Fortress.TickVisuals()   #   核心脉动 + 受击闪光 + 崩塌动画
+  ├── HUD._Process()           #   血量/冷却/计分更新
+  └── 终局检测                  #   10号城被摧毁→EndGame→环绕镜头</code></pre>
+
+<h3>AI 行为树</h3>
+<pre><code>Runner.Think() (每 0.25s)
+  ├── TryDefend()              # 优先：己方城池被入侵→最近 AI 折返拦截
+  ├── 选择目标                  # 敌方最低编号完好城池
+  ├── 路径策略                  # 己方侧跑路→接近目标 14m 内切入敌方巷道
+  ├── SteerToBlocks()          # 横向偏向最近存活的敌方方块
+  ├── 遭遇战                   # 近身敌人→冲刺撞击
+  └── 拆墙                     # 被墙卡住→爆破→换巷道</code></pre>
+
+<h3>GLB 模型清单</h3>
+<table>
+<tr><th>文件</th><th>用途</th><th>面数</th><th>尺寸(归一化)</th></tr>
+<tr><td>castle_blue / castle_red</td><td>1号城+10号城城堡 keep</td><td>~9.5k</td><td>1.9×1.8×1.4</td></tr>
+<tr><td>castle_terminal</td><td>远端地标城堡</td><td>9.8k</td><td>1.9×1.0×1.7</td></tr>
+<tr><td>tower_blue / tower_red</td><td>城池门前瞭望塔</td><td>~4.9k</td><td>1.0×1.9×1.0</td></tr>
+<tr><td>compound_blue / compound_red</td><td>城池围墙建筑群</td><td>~9.6k</td><td>1.9×1.3×1.7</td></tr>
+<tr><td>tree</td><td>路侧针叶松树</td><td>2.0k</td><td>0.9×1.9×0.9</td></tr>
+<tr><td>tree_broadleaf</td><td>路侧阔叶树</td><td>1.9k</td><td>1.3×1.9×1.3</td></tr>
+<tr><td>bush</td><td>路侧灌木</td><td>792</td><td>1.6×1.6×1.8</td></tr>
+<tr><td>coin</td><td>公路金币</td><td>578</td><td>1.9×1.9×0.5</td></tr>
+<tr><td>rubble</td><td>城池摧毁废墟</td><td>2.4k</td><td>1.9×0.7×1.9</td></tr>
+<tr><td>spawn_pen_blue / red</td><td>出生区围栏</td><td>~2.9k</td><td>1.9×1.0×1.9</td></tr>
+<tr><td>wall_segment</td><td>城墙段（备用）</td><td>2.9k</td><td>1.9×0.9×0.3</td></tr>
+</table>
+
+<h3>关键调优参数（Game.cs）</h3>
+<table>
+<tr><th>参数</th><th>值</th><th>说明</th></tr>
+<tr><td>RunSpeed</td><td>9</td><td>角色自动奔跑速度</td></tr>
+<tr><td>BlastBlockDmg</td><td>70</td><td>爆破对方块的伤害</td></tr>
+<tr><td>DashBlockDmg</td><td>45</td><td>冲刺对方块的伤害</td></tr>
+<tr><td>BlastCd / DashCd</td><td>2.2s / 3.5s</td><td>技能冷却</td></tr>
+<tr><td>墙血量</td><td>20</td><td>方块城墙 HP（Fortress.cs）</td></tr>
+<tr><td>核心血量</td><td>90+12×编号</td><td>核心水晶 HP（+50 给 10 号城）</td></tr>
+<tr><td>回防阈值</td><td>30%</td><td>城池血量低于此值不再触发回防</td></tr>
+</table>
+
+<h3>操作说明</h3>
+<table>
+<tr><th>按键</th><th>功能</th></tr>
+<tr><td>A / ←</td><td>左变道</td></tr>
+<tr><td>D / →</td><td>右变道</td></tr>
+<tr><td>S / ↓</td><td>掉头折返（回防自家城池）</td></tr>
+<tr><td>空格 / J</td><td>范围爆破（伤敌方方块与角色）</td></tr>
+<tr><td>Shift / K</td><td>冲刺撞击（伤敌方角色、撞碎薄墙）</td></tr>
+<tr><td>R</td><td>结算界面重开</td></tr>
+</table>
+
+<hr>
+<p style="text-align:center; color:#888; font-size:.85em;">
+堡垒冲刺 Fortress Rush · Godot 4.7.1 .NET · 2026-09-01
+</p>
+
+</body>
+</html>
