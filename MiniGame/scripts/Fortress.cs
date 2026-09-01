@@ -135,7 +135,7 @@ public partial class Fortress : Node3D
 		// the #1 outpost and #10 main city both get a GLB castle keep (home landmark + objective)
 		if (Index == 1 || Index == Game.FortressCount)
 		{
-			float keepHeight = Index == 1 ? 8f : Game.CastleHeight;
+			float keepHeight = Index == 1 ? 6f : Game.CastleHeight;
 			var keep = Glb.Create(CastlePath(), keepHeight);
 			if (keep != null)
 			{
@@ -310,7 +310,7 @@ public partial class Fortress : Node3D
         float zRear = (ZMin + ZMax) - zFront;
         float compoundW = innerX - outerX;
         float compoundD = zRear - zFront;
-        float compoundH = 6f; // ~2.5x character height (taller than maze blocks, shorter than towers)
+        float compoundH = 5f; // ~2x character height
 
         string compoundPath = $"res://assets/glb/compound_{(Team == Team.Blue ? "blue" : "red")}.glb";
         var compound = Glb.Create(compoundPath, compoundH);
@@ -325,7 +325,7 @@ public partial class Fortress : Node3D
         }
 
         // fallback: procedural curtain walls
-        float wallY = 3f;
+        float wallY = 2.5f;
         float wallT = 0.6f;
         var mat = WallMat(rng);
         void Wall(float x, float z, float sx, float sz)

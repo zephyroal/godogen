@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://b4oj45wstr4ja"
-path="res://.godot/imported/spawn_pen_blue_orm.jpg-2cd1a3920d3b07e35aec6a5a478b7581.ctex"
+path.s3tc="res://.godot/imported/spawn_pen_blue_orm.jpg-2cd1a3920d3b07e35aec6a5a478b7581.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "d86d92dc4ddae138799517bf814eca02"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/glb/spawn_pen_blue_orm.jpg"
-dest_files=["res://.godot/imported/spawn_pen_blue_orm.jpg-2cd1a3920d3b07e35aec6a5a478b7581.ctex"]
+dest_files=["res://.godot/imported/spawn_pen_blue_orm.jpg-2cd1a3920d3b07e35aec6a5a478b7581.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -40,4 +41,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0

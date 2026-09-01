@@ -27,9 +27,9 @@ public partial class Game : Node3D
     public const int PlayerHp = 120;
     public const int AiHp = 90;
     public const int FortressCount = 10;
-    public const float CastleHeight = 12f; // GLB keep at the #10 main city
-    public const float TowerHeight = 10f;  // GLB watchtowers — taller than compound walls
-    public const float TreeHeight = 6f;    // GLB roadside pines — ~2.5x character height
+    public const float CastleHeight = 10f; // GLB keep at the #10 main city
+    public const float TowerHeight = 8f;   // GLB watchtowers — taller than compound walls
+    public const float TreeHeight = 5f;    // GLB roadside pines — ~2x character height
     public const float FrontlineSpawnZ = 20f; // 阶段1：出生在己方1号城池后方的前期交火位
 
     /// <summary>Six lanes flanking a central road. Blue side = 0..2 (x&lt;0), Red side = 3..5 (x&gt;0).</summary>
@@ -137,9 +137,9 @@ public partial class Game : Node3D
         }
         else
         {
-            // chase camera: behind and above the runner, looking down the run axis (subway-surfers view)
+            // tactical overview: steep ~60° pitch, wide view, player in lower third (per concept art)
             int heading = Player != null ? Player.Heading : -1;
-            var camTarget = focus + new Vector3(0f, 12.5f, -heading * 19f);
+            var camTarget = focus + new Vector3(0f, 26f, -heading * 30f);
             _cam.Position = _cam.Position.Lerp(camTarget, Mathf.Min(1f, dt * 5f));
             if (_shake > 0f)
             {
@@ -147,7 +147,7 @@ public partial class Game : Node3D
                 float a = Mathf.Max(0f, _shake / 0.35f) * 0.6f;
                 _cam.Position += new Vector3(Rng.NextSingle() - 0.5f, (Rng.NextSingle() - 0.5f) * 0.5f, Rng.NextSingle() - 0.5f) * a;
             }
-            _cam.LookAt(focus + new Vector3(0f, 1.2f, heading * 14f), Vector3.Up);
+            _cam.LookAt(focus + new Vector3(0f, 0f, heading * 15f), Vector3.Up);
             _sun.Position = focus + new Vector3(0f, 40f, 0f);
         }
 
@@ -220,7 +220,7 @@ public partial class Game : Node3D
         {
             Name = "Camera",
             Projection = Camera3D.ProjectionType.Perspective,
-            Fov = 55f,
+            Fov = 42f,
             Near = 0.5f,
             Far = 600f,
         };
@@ -587,7 +587,7 @@ public partial class Game : Node3D
             AddChild(redFort);
             Fortresses.Add(redFort);
 
-            z += depth + 4f;
+            z += depth + 8f;
         }
         SpawnZ = z + 3f;
         PlayerSpawnZ = SpawnZ; // both teams spawn south of the last fortress, run north
@@ -616,8 +616,8 @@ public partial class Game : Node3D
     private void PrePositionCamera()
     {
         if (Player == null) return;
-        _cam.Position = Player.Position + new Vector3(0f, 12.5f, -Player.Heading * 19f);
-        _cam.LookAt(Player.Position + new Vector3(0f, 1.2f, Player.Heading * 14f), Vector3.Up);
+        _cam.Position = Player.Position + new Vector3(0f, 26f, -Player.Heading * 30f);
+        _cam.LookAt(Player.Position + new Vector3(0f, 0f, Player.Heading * 15f), Vector3.Up);
     }
 
     // ---- queries used by runners ----

@@ -25,7 +25,9 @@ public static class Glb
         return aabb.Size * (targetHeight / aabb.Size.Y) * 0.5f;
     }
 
-    /// <summary>Load a GLB, scale it to targetHeight, bottom-align y=0, center the footprint on the node origin.</summary>
+    /// <summary>Load a GLB, scale it to targetHeight, bottom-align y=0, center the footprint on the node origin.
+    /// Returns a named placement node ("&lt;model&gt;_wrap"); the single child is the scene instance carrying the
+    /// normalize transform, so callers can freely set Position/Rotation/Scale on the returned node.</summary>
     public static Node3D Create(string resPath, float targetHeight)
     {
         var ps = Load(resPath);
@@ -39,15 +41,15 @@ public static class Glb
         }
 
         float s = targetHeight / aabb.Size.Y;
-        // holder keeps the GLB's own root transform untouched; wrap origin = bottom center
-        var wrap = new Node3D();
-        var holder = new Node3D
-        {
-            Scale = Vector3.One * s,
-            Position = new Vector3(-aabb.GetCenter().X * s, -aabb.Position.Y * s, -aabb.GetCenter().Z * s),
-        };
-        holder.AddChild(inst);
-        wrap.AddChild(holder);
+        // bake the normalize transform (target-height scale + bottom-center align) into the instance root:
+        // one parent level instead of two, and the wrap stays free for placement transforms
+        var normalize = new Transform3D(
+            Basis.Identity.Scaled(Vector3.One * s),
+            new Vector3(-aabb.GetCenter().X * s, -aabb.Position.Y * s, -aabb.GetCenter().Z * s));
+        inst.Transform = normalize * inst.Transform;
+
+        var wrap = new Node3D { Name = $"{resPath.GetFile().GetBaseName()}_wrap" };
+        wrap.AddChild(inst);
         return wrap;
     }
 
