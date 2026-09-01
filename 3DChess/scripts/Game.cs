@@ -19,6 +19,7 @@ public partial class Game : Node3D
     public Camera3D Cam { get; private set; }
     public Board Board { get; private set; }
     public HUD Hud { get; private set; }
+    public AudioPlayer Audio { get; private set; }
     public readonly List<Piece> AllPieces = new();
     private readonly Dictionary<int, Piece> _pieces = new();
     private readonly Dictionary<int, Vector2> _touchPos = new();
@@ -114,6 +115,9 @@ public partial class Game : Node3D
         Cam = new Camera3D { Fov = 38f, Near = 0.1f, Far = 100f };
         AddChild(Cam);
         Cam.MakeCurrent();
+
+        Audio = new AudioPlayer();
+        AddChild(Audio);
     }
 
     private void SpawnPieces()
@@ -149,6 +153,7 @@ public partial class Game : Node3D
             var dustTimer = GetTree().CreateTimer(1.2f);
             dustTimer.Timeout += dust.QueueFree;
             _movingPiece = null;
+            Audio.Play("move");
             FinishMove();
         }
 
@@ -159,6 +164,7 @@ public partial class Game : Node3D
             _aiTask = null;
             _aiApplyDelay = 0.4f;
             _pendingAiMove = result.Move;
+            Audio.StopLoop();
         }
         if (_pendingAiMove != null && _movingPiece == null)
         {
@@ -313,6 +319,7 @@ public partial class Game : Node3D
                 return;
             }
             Board.ShowIllegal(idx); // non-legal target: brief red flash, keep the selection
+            Audio.Play("illegal");
             return;
         }
 
@@ -332,6 +339,7 @@ public partial class Game : Node3D
         _selected.SetSelected(true);
         Board.ShowSelection(idx);
         Board.ShowMoves(_legalCache, idx, Position.Cells);
+        Audio.Play("select");
     }
 
     private void Deselect()
@@ -364,6 +372,7 @@ public partial class Game : Node3D
         if (victim != null)
         {
             victim.Alive = false;
+            Audio.Play("capture");
             var w = Board.WorldOf(m.To);
             var burst = FX.Burst(w + new Vector3(0f, 0.3f, 0f),
                 victim.Side == Side.Red ? new Color(0.85f, 0.3f, 0.2f) : new Color(0.3f, 0.26f, 0.22f));
@@ -399,6 +408,8 @@ public partial class Game : Node3D
             Board.ShowCheck(Rules.InCheck(Position.Cells, Position.Turn) ? Rules.FindKing(Position.Cells, Position.Turn) : null);
             Hud.SetTurn(null, false, 0);
             Hud.ShowEnd(loser == Side.Red ? Side.Black : Side.Red, mate);
+            Audio.Play(mate ? "checkmate" : "stalemate");
+            GetTree().CreateTimer(0.8f).Timeout += () => Audio.Play(loser == Side.Red ? "victory" : "defeat");
 
             // celebration burst over the defeated king
             var kPos = Board.WorldOf(Rules.FindKing(Position.Cells, loser));
@@ -411,7 +422,7 @@ public partial class Game : Node3D
 
         bool inCheck = Rules.InCheck(Position.Cells, Position.Turn);
         Board.ShowCheck(inCheck ? Rules.FindKing(Position.Cells, Position.Turn) : null);
-        if (inCheck) Hud.FlashCheck();
+        if (inCheck) { Hud.FlashCheck(); Audio.Play("check"); }
 
         bool aiTurn = CurrentMode == Mode.VsAI && Position.Turn == Side.Black;
         Hud.SetTurn(Position.Turn, aiTurn, Position.History.Count + 1);
@@ -424,6 +435,7 @@ public partial class Game : Node3D
         var cells = (int[])Position.Cells.Clone();
         _aiTask = new System.Threading.Tasks.Task<AI.Result>(() => AI.Search(cells, Position.Turn, 900));
         _aiTask.Start();
+        Audio.StartLoop("ai_thinking");
     }
 
     // ---- lifecycle ----
@@ -436,6 +448,7 @@ public partial class Game : Node3D
         CurrentMode = mode;
         GameStarted = true;
         Hud.SetTurn(Position.Turn, false, 1);
+        Audio.Play("game_start");
     }
 
     public void Rematch()
@@ -450,6 +463,7 @@ public partial class Game : Node3D
     {
         if (!GameStarted || GameOver || _movingPiece != null || _aiTask != null || Position.History.Count == 0) return;
         if (_pendingAiMove != null) return;
+        Audio.Play("undo");
 
         int plies = CurrentMode == Mode.VsAI
             ? (Position.Turn == Side.Red && Position.History.Count >= 2 ? 2 : 1)

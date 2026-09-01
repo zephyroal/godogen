@@ -13,6 +13,7 @@ public partial class Block : MeshInstance3D
     public void TakeDamage(float dmg)
     {
         Hp -= dmg;
+        Game.Instance?.Audio?.Play("block_hit");
         if (Hp <= 0f) DestroySelf();
     }
 
@@ -21,6 +22,7 @@ public partial class Block : MeshInstance3D
         Fortress?.OnBlockRemoved(this);
         var fx = FX.BlockBurst(GlobalPosition, Game.ColorOf(Fortress.Team), IsCore ? 24 : 12);
         Game.Instance?.AddChild(fx);
+        Game.Instance?.Audio?.Play("block_destroyed");
         QueueFree();
     }
 }

@@ -46,6 +46,7 @@ public partial class Game : Node3D
     public readonly System.Random SceneryRng = new(42); // scenery-only stream, so baking the world never shifts gameplay RNG
     public Runner Player { get; private set; }
     public HUD Hud { get; private set; }
+    public AudioPlayer Audio { get; private set; }
     public float SpawnZ { get; private set; }
     public bool GameOver { get; private set; }
     public float PlayerSpawnZ { get; private set; } // set after BuildFortresses
@@ -95,6 +96,8 @@ public partial class Game : Node3D
         SpawnRunners();
         Hud = new HUD { Name = "HUD" };
         AddChild(Hud);
+        Audio = new AudioPlayer();
+        AddChild(Audio);
         if (OS.IsDebugBuild())
             AddChild(new Fps { Name = "Fps" }); // release builds: no node, zero overhead
         PrePositionCamera();
@@ -253,8 +256,8 @@ public partial class Game : Node3D
         AddChild(world);
         var moving = new List<Node>();
         foreach (Node child in GetChildren())
-            if (child != world && child is not Fortress && child is not Runner && child is not HUD)
-                moving.Add(child);
+            if (child != world && child is not Fortress && child is not Runner && child is not CanvasLayer)
+                moving.Add(child); // CanvasLayer covers HUD and the debug Fps overlay — UI stays runtime-only
         foreach (Node child in moving)
         {
             RemoveChild(child);
@@ -676,6 +679,7 @@ public partial class Game : Node3D
     public void RunnerDied(Runner r)
     {
         Hud?.Announce(r == Player ? "你被击败了…" : $"{NameOf(r)} 被击败", 1.5f);
+        Audio?.Play("runner_dead");
     }
 
     public static string NameOf(Runner r) => r.IsPlayer ? "你" : (r.Team == Team.Blue ? "蓝方队友" : "红方敌人");
@@ -684,6 +688,8 @@ public partial class Game : Node3D
     {
         Hud?.UpdateFortressSquares();
         Hud?.Announce($"{(f.Team == Team.Blue ? "蓝" : "红")}{f.Index} 号城池被摧毁！", 2.5f);
+        Audio?.Play("fortress_destroyed");
+        Audio?.Play("announce");
         if (GameOver) return;
         if (f.Team == Team.Red && f.Index == FortressCount)
         {
@@ -717,5 +723,6 @@ public partial class Game : Node3D
         foreach (var f in destroyed)
             names.Add($"{(loser == Team.Blue ? "蓝" : "红")}{f.Index}");
         Hud.ShowEndScreen(winner == Team.Blue, names);
+        Audio?.Play(winner == Team.Blue ? "victory" : "defeat");
     }
 }

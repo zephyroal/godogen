@@ -12,6 +12,7 @@ namespace FortressRush;
 public static class Glb
 {
     private static readonly Dictionary<string, PackedScene> Cache = new();
+    private static readonly Dictionary<string, int> Placed = new();
 
     /// <summary>Half extents (X, Y, Z) of the model scaled to targetHeight. Zero if absent.</summary>
     public static Vector3 ScaledHalfExtents(string resPath, float targetHeight)
@@ -48,7 +49,11 @@ public static class Glb
             new Vector3(-aabb.GetCenter().X * s, -aabb.Position.Y * s, -aabb.GetCenter().Z * s));
         inst.Transform = normalize * inst.Transform;
 
-        var wrap = new Node3D { Name = $"{resPath.GetFile().GetBaseName()}_wrap" };
+        // unique explicit name per placement: Godot 4.4+ replaces colliding sibling names with
+        // anonymous @ClassName@N names, so duplicates must never share a name
+        Placed.TryGetValue(resPath, out int n);
+        Placed[resPath] = n + 1;
+        var wrap = new Node3D { Name = $"{resPath.GetFile().GetBaseName()}_wrap_{n + 1}" };
         wrap.AddChild(inst);
         return wrap;
     }

@@ -75,9 +75,9 @@ public partial class Runner : Node3D
 
     private void ReadPlayerInput()
     {
-        if (Input.IsActionJustPressed("move_left")) TargetLane = Mathf.Max(0, TargetLane - 1);
-        if (Input.IsActionJustPressed("move_right")) TargetLane = Mathf.Min(5, TargetLane + 1);
-        if (Input.IsActionJustPressed("turn_back")) Heading *= -1;
+        if (Input.IsActionJustPressed("move_left")) { TargetLane = Mathf.Max(0, TargetLane - 1); Game.Instance.Audio?.Play("lane_switch"); }
+        if (Input.IsActionJustPressed("move_right")) { TargetLane = Mathf.Min(5, TargetLane + 1); Game.Instance.Audio?.Play("lane_switch"); }
+        if (Input.IsActionJustPressed("turn_back")) { Heading *= -1; Game.Instance.Audio?.Play("turn_back"); }
         if (Input.IsActionJustPressed("blast")) TryBlast();
         if (Input.IsActionJustPressed("dash")) TryDash();
     }
@@ -340,6 +340,8 @@ public partial class Runner : Node3D
         Game.Instance.AddFx(new LaserFx(Position + new Vector3(0f, 1.4f, 0f), laserEnd, Game.ColorOf(Team)));
         Game.Instance.AddFx(new BlastFx(center, Game.BlastRadius));
         Game.Instance.Shake(0.35f);
+        Game.Instance.Audio?.Play("blast");
+        Game.Instance.Audio?.Play("laser");
 
         foreach (var r in Game.Instance.Runners)
         {
@@ -365,6 +367,7 @@ public partial class Runner : Node3D
         DashTimer = Game.DashTime;
         _dashVictims.Clear();
         Game.Instance.AddFx(new DashTrailFx(Position + new Vector3(0f, 0f, Heading * 1.5f), Game.ColorOf(Team)));
+        Game.Instance.Audio?.Play("dash");
     }
 
     private void RamEnemies()
@@ -392,6 +395,7 @@ public partial class Runner : Node3D
         Position += new Vector3(0f, 0f, knockDir * 0.8f);
         _body.Scale = new Vector3(1.25f, 1.25f, 1.25f); // hit pop
         Game.Instance.AddFx(new HitSparkFx(Position + new Vector3(0f, 1.2f, 0f), Game.ColorOf(Team)));
+        Game.Instance.Audio?.Play("runner_hit");
         if (Hp <= 0f) Die();
     }
 
@@ -415,6 +419,7 @@ public partial class Runner : Node3D
         TargetLane = NearestLane(p.X);
         StunTimer = 1.2f; // brief invulnerability-ish grace
         Rotation = new Vector3(0f, 0f, 0f);
+        Game.Instance.Audio?.Play("respawn");
     }
 
     private void Regenerate(float dt)
