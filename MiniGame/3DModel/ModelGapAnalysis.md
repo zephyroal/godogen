@@ -1,7 +1,7 @@
 # 模型差距分析（ModelGapAnalysis）
 
 对比参考概念图 `20260831084611_2940_7.png` 与当前游戏实际截图，列出缺失的 3D 模型与结构。
-更新：2026-09-01
+更新：2026-09-01 · 状态：**全部完成并验证**。新 GLB 模型（compound / spawn_pen / tree_broadleaf / bush / coin / rubble / castle_terminal / wall_segment）已全部接入，替换对应程序化几何。
 
 ---
 

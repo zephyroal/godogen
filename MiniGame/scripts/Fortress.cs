@@ -85,7 +85,7 @@ public partial class Fortress : Node3D
         // core crystal on the last row, middle lane. The #10 keep displaces wall cells and
         // gate pillars, so its crystal is armored to keep the main city the toughest fortress.
         float coreZ = ZMin + 1.5f + (rows - 1) * Game.BlockSize;
-        float coreHp = 90f + 12f * Index + (Index == Game.FortressCount ? 500f : 0f);
+        float coreHp = 90f + 12f * Index + (Index == Game.FortressCount ? 50f : 0f);
         _coreMat = CoreMat();
         Core = MakeBlock(Game.LaneX[baseLane + 1], 2.2f, coreZ, _coreMat, hp: coreHp, laneIdx: baseLane + 1, isCore: true);
         Core.Scale = new Vector3(0.87f, 0.73f, 0.87f);
@@ -195,7 +195,7 @@ public partial class Fortress : Node3D
     {
         var rng = Game.Instance?.Rng;
         float y = 1.5f + level * Game.BlockSize;
-        MakeBlock(Game.LaneX[laneIdx], y, z, WallMat(rng), hp: 70f, laneIdx: laneIdx, isCore: false);
+        MakeBlock(Game.LaneX[laneIdx], y, z, WallMat(rng), hp: 20f, laneIdx: laneIdx, isCore: false);
     }
 
     private Block MakeBlock(float x, float y, float z, StandardMaterial3D mat, float hp, int laneIdx, bool isCore)
@@ -302,32 +302,44 @@ public partial class Fortress : Node3D
         });
     }
 
-    /// <summary>Curtain walls linking the four corner pillars into a compound, with a gate gap on the road side.</summary>
+    /// <summary>Compound GLB replaces procedural curtain walls; falls back to BoxMesh walls.</summary>
     private void BuildWalls(System.Random rng, int baseLane, float zFront)
     {
         float outerX = Game.LaneX[baseLane] - 3.5f;
         float innerX = (Game.LaneX[baseLane + 1] + Game.LaneX[baseLane + 2]) * 0.5f;
         float zRear = (ZMin + ZMax) - zFront;
+        float compoundW = innerX - outerX;
+        float compoundD = zRear - zFront;
+        float compoundH = 3f;
+
+        string compoundPath = $"res://assets/glb/compound_{(Team == Team.Blue ? "blue" : "red")}.glb";
+        var compound = Glb.Create(compoundPath, compoundH);
+        if (compound != null)
+        {
+            compound.Position = new Vector3((outerX + innerX) * 0.5f, 0f, (zFront + zRear) * 0.5f);
+            compound.RotationDegrees = new Vector3(0f, EnemyFacingYaw(), 0f);
+            // stretch to fill the fortress footprint
+            compound.Scale = new Vector3(compoundW / 9f, 1f, compoundD / 9f);
+            AddChild(compound);
+            return;
+        }
+
+        // fallback: procedural curtain walls
         float wallY = 1.5f;
-        float wallH = 3f;
         float wallT = 0.6f;
         var mat = WallMat(rng);
         void Wall(float x, float z, float sx, float sz)
         {
             var b = MakeBlock(x, wallY, z, mat, hp: 30f, laneIdx: -1, isCore: false);
-            b.Scale = new Vector3(sx / Game.BlockSize, wallH / Game.BlockSize, sz / Game.BlockSize);
+            b.Scale = new Vector3(sx / Game.BlockSize, compoundH / Game.BlockSize, sz / Game.BlockSize);
         }
-        // Z-aligned walls (front and rear, split around the gate gap on the road side)
-        float gapHalf = 2.8f; // gate opening half-width
+        float gapHalf = 2.8f;
         float midX = (outerX + innerX) * 0.5f;
         float frontLenL = Mathf.Max(0.1f, midX - gapHalf - outerX);
         float frontLenR = Mathf.Max(0.1f, innerX - (midX + gapHalf));
-        // front wall (road side, zFront)
         if (frontLenL > 0.5f) Wall((outerX + midX - gapHalf) * 0.5f, zFront, frontLenL, wallT);
         if (frontLenR > 0.5f) Wall((midX + gapHalf + innerX) * 0.5f, zFront, frontLenR, wallT);
-        // rear wall (no gap needed)
         Wall(midX, zRear, innerX - outerX, wallT);
-        // X-aligned side walls (connecting front to rear along outer and inner edges)
         Wall(outerX, (zFront + zRear) * 0.5f, wallT, zRear - zFront);
         Wall(innerX, (zFront + zRear) * 0.5f, wallT, zRear - zFront);
     }
@@ -411,35 +423,45 @@ public partial class Fortress : Node3D
             Game.Instance?.AddChild(FX.BlockBurst(new Vector3(_keepBase.X, 6f, _keepBase.Z), Game.ColorOf(Team), 26));
         }
 
-        // rubble: broken wall fragments and shattered pillars (visual, never blocks lanes)
-        var rubbleMat = new StandardMaterial3D { AlbedoColor = new Color(0.42f, 0.42f, 0.44f), Roughness = 1f };
-        var teamRubbleMat = new StandardMaterial3D
-        {
-            AlbedoColor = new Color(Game.ColorOf(Team).R * 0.4f, Game.ColorOf(Team).G * 0.4f, Game.ColorOf(Team).B * 0.4f),
-            Roughness = 1f,
-        };
+        // rubble: GLB model or procedural broken fragments (visual, never blocks lanes)
         int baseLane = Game.LaneBase(Team);
         float outerX = Game.LaneX[baseLane] - 3.5f;
         float innerX = (Game.LaneX[baseLane + 1] + Game.LaneX[baseLane + 2]) * 0.5f;
         var rng = Game.Instance?.Rng ?? new System.Random();
-        for (int i = 0; i < 14; i++)
+
+        var rubbleGlb = Glb.Create("res://assets/glb/rubble.glb", 2f);
+        if (rubbleGlb != null)
         {
-            bool isPillar = i % 3 == 0;
-            float x = Mathf.Lerp(outerX, innerX, (float)rng.NextDouble());
-            float z = Mathf.Lerp(ZMin, ZMax, (float)rng.NextDouble());
-            float h = isPillar ? 1.2f + (float)rng.NextDouble() * 1.5f : 0.3f + (float)rng.NextDouble() * 0.5f;
-            float w = isPillar ? 0.6f : 1.2f + (float)rng.NextDouble() * 0.8f;
-            float d = isPillar ? 0.6f : 0.8f + (float)rng.NextDouble() * 0.6f;
-            float tilt = isPillar ? (float)rng.NextDouble() * 30f - 15f : (float)rng.NextDouble() * 20f;
-            var r = new MeshInstance3D
+            rubbleGlb.Position = new Vector3((outerX + innerX) * 0.5f, 0f, CenterZ);
+            rubbleGlb.Scale = new Vector3((innerX - outerX) / 4f, 1f, (ZMax - ZMin) / 4f);
+            AddChild(rubbleGlb);
+        }
+        else
+        {
+            var rubbleMat = new StandardMaterial3D { AlbedoColor = new Color(0.42f, 0.42f, 0.44f), Roughness = 1f };
+            var teamRubbleMat = new StandardMaterial3D
             {
-                Mesh = new BoxMesh { Size = new Vector3(w, h, d) },
-                MaterialOverride = i % 4 == 0 ? teamRubbleMat : rubbleMat,
-                Position = new Vector3(x, h * 0.5f, z),
-                RotationDegrees = new Vector3(tilt, (float)rng.NextDouble() * 180f, tilt * 0.5f),
-                CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+                AlbedoColor = new Color(Game.ColorOf(Team).R * 0.4f, Game.ColorOf(Team).G * 0.4f, Game.ColorOf(Team).B * 0.4f),
+                Roughness = 1f,
             };
-            AddChild(r);
+            for (int i = 0; i < 14; i++)
+            {
+                bool isPillar = i % 3 == 0;
+                float x = Mathf.Lerp(outerX, innerX, (float)rng.NextDouble());
+                float z = Mathf.Lerp(ZMin, ZMax, (float)rng.NextDouble());
+                float h = isPillar ? 1.2f + (float)rng.NextDouble() * 1.5f : 0.3f + (float)rng.NextDouble() * 0.5f;
+                float w = isPillar ? 0.6f : 1.2f + (float)rng.NextDouble() * 0.8f;
+                float d = isPillar ? 0.6f : 0.8f + (float)rng.NextDouble() * 0.6f;
+                float tilt = isPillar ? (float)rng.NextDouble() * 30f - 15f : (float)rng.NextDouble() * 20f;
+                AddChild(new MeshInstance3D
+                {
+                    Mesh = new BoxMesh { Size = new Vector3(w, h, d) },
+                    MaterialOverride = i % 4 == 0 ? teamRubbleMat : rubbleMat,
+                    Position = new Vector3(x, h * 0.5f, z),
+                    RotationDegrees = new Vector3(tilt, (float)rng.NextDouble() * 180f, tilt * 0.5f),
+                    CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+                });
+            }
         }
 
         _sign.Modulate = new Color(0.55f, 0.55f, 0.55f);

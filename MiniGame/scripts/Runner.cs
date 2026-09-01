@@ -335,7 +335,8 @@ public partial class Runner : Node3D
         BlastCdTimer = Game.BlastCd;
         BlastCount++;
         var center = Position + new Vector3(0f, 1.6f, Heading * 3.5f);
-        Game.Instance.AddFx(new LaserFx(Position + new Vector3(0f, 1.4f, 0f), center, Game.ColorOf(Team)));
+        var laserEnd = Position + new Vector3(0f, 1.4f, Heading * 12f);
+        Game.Instance.AddFx(new LaserFx(Position + new Vector3(0f, 1.4f, 0f), laserEnd, Game.ColorOf(Team)));
         Game.Instance.AddFx(new BlastFx(center, Game.BlastRadius));
         Game.Instance.Shake(0.35f);
 

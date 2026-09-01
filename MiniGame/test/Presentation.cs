@@ -44,7 +44,11 @@ public partial class Presentation : SceneTree
         At(20.0f, () => Press("dash"));
         At(2.0f, () => Snap("01_start"));
         At(20.0f, () => Snap("02_midgame"));
+        At(21.4f, () => Press("blast"));        // extra blast timed for screenshot
+        At(21.5f, () => Snap("02b_blast_fx"));  // capture ~0.1s after the blast
         At(34.0f, () => Snap("03_deep_attack"));
+        At(36.2f, () => Press("blast"));        // extra blast timed for screenshot
+        At(36.3f, () => Snap("03b_blast_fx2"));  // capture right after the blast
         // brief home-defense turn (showcases 掉头防守 + the interception AI), then resume
         At(38.0f, () => Press("turn_back"));
         At(38.5f, () => Snap("04_defense_turn"));

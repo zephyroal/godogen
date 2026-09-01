@@ -13,13 +13,13 @@ public partial class Game : Node3D
     public const float RunSpeed = 9f;
     public const float LaneSpeed = 11f;
     public const float BlastRadius = 7f;
-    public const float BlastBlockDmg = 55f;
+    public const float BlastBlockDmg = 70f;
     public const float BlastRunnerDmg = 30f;
     public const float BlastCd = 2.2f;
     public const float DashTime = 0.35f;
     public const float DashMult = 3.2f;
     public const float DashRunnerDmg = 35f;
-    public const float DashBlockDmg = 30f;
+    public const float DashBlockDmg = 45f;
     public const float DashCd = 3.5f;
     public const float RespawnDelay = 3f;
     public const float RegenDelay = 5f;
@@ -268,14 +268,33 @@ public partial class Game : Node3D
         }
 
         BuildScenery();
+        BuildCoins();
         BuildCamps();
         BuildLandmarkCastle();
     }
 
-    /// <summary>Distant decorative castle at the far end of the road (per concept art).</summary>
+    /// <summary>Coins scattered on the road (decorative).</summary>
+    private void BuildCoins()
+    {
+        const string coinPath = "res://assets/glb/coin.glb";
+        for (int i = 0; i < 12; i++)
+        {
+            float z = PlayerSpawnZ - 10f - i * 16f;
+            if (z < -SpawnZ + 10f) break;
+            var coin = Glb.Create(coinPath, 1.2f);
+            if (coin != null)
+            {
+                coin.Position = new Vector3(0f, 1f, z);
+                coin.RotationDegrees = new Vector3(90f, i * 30f, 0f);
+                AddChild(coin);
+            }
+        }
+    }
+
+    /// <summary>Distant castle_terminal at the far end of the road (per concept art landmark).</summary>
     private void BuildLandmarkCastle()
     {
-        var landmark = Glb.Create("res://assets/glb/castle_red.glb", 20f);
+        var landmark = Glb.Create("res://assets/glb/castle_terminal.glb", 20f);
         if (landmark != null)
         {
             landmark.Position = new Vector3(0f, 0f, -SpawnZ + 8f);
@@ -340,14 +359,16 @@ public partial class Game : Node3D
             AddChild(rock);
         }
 
-        // broadleaf trees and bushes (concept art has two tree types + shrubs)
+        // broadleaf trees (GLB) and bushes (GLB), with procedural fallback
+        const string broadleafPath = "res://assets/glb/tree_broadleaf.glb";
+        const string bushPath = "res://assets/glb/bush.glb";
         var bTrunkMat = new StandardMaterial3D { AlbedoColor = new Color(0.38f, 0.27f, 0.15f), Roughness = 1f };
         var bLeafMat1 = new StandardMaterial3D { AlbedoColor = new Color(0.35f, 0.58f, 0.28f), Roughness = 1f };
         var bLeafMat2 = new StandardMaterial3D { AlbedoColor = new Color(0.42f, 0.63f, 0.32f), Roughness = 1f };
         var bushMat = new StandardMaterial3D { AlbedoColor = new Color(0.28f, 0.50f, 0.24f), Roughness = 1f };
         var bTrunkMesh = new BoxMesh { Size = new Vector3(0.8f, 2.0f, 0.8f), Material = bTrunkMat };
         var bLeafMesh = new SphereMesh { Radius = 1.6f, Height = 3.2f, RadialSegments = 8, Rings = 4 };
-        var bushMesh = new SphereMesh { Radius = 0.7f, Height = 1.4f, RadialSegments = 6, Rings = 3 };
+        var bushMeshFallback = new SphereMesh { Radius = 0.7f, Height = 1.4f, RadialSegments = 6, Rings = 3 };
 
         for (int t = 0; t < 12; t++)
         {
@@ -355,14 +376,27 @@ public partial class Game : Node3D
             float x = side * (21f + (float)Rng.NextDouble() * 4f);
             float z = -170f + (float)Rng.NextDouble() * 340f;
             float s = 0.9f + (float)Rng.NextDouble() * 0.5f;
-            AddChild(new MeshInstance3D { Mesh = bTrunkMesh, Position = new Vector3(x, 1.0f * s, z), Scale = Vector3.One * s });
-            AddChild(new MeshInstance3D
+            float yaw = (float)Rng.NextDouble() * 360f;
+
+            var blTree = Glb.Create(broadleafPath, TreeHeight);
+            if (blTree != null)
             {
-                Mesh = bLeafMesh,
-                MaterialOverride = t % 2 == 0 ? bLeafMat1 : bLeafMat2,
-                Position = new Vector3(x, (2.0f + 1.2f) * s, z),
-                Scale = Vector3.One * s,
-            });
+                blTree.Position = new Vector3(x, 0f, z);
+                blTree.RotationDegrees = new Vector3(0f, yaw, 0f);
+                blTree.Scale = Vector3.One * s;
+                AddChild(blTree);
+            }
+            else
+            {
+                AddChild(new MeshInstance3D { Mesh = bTrunkMesh, Position = new Vector3(x, 1.0f * s, z), Scale = Vector3.One * s });
+                AddChild(new MeshInstance3D
+                {
+                    Mesh = bLeafMesh,
+                    MaterialOverride = t % 2 == 0 ? bLeafMat1 : bLeafMat2,
+                    Position = new Vector3(x, (2.0f + 1.2f) * s, z),
+                    Scale = Vector3.One * s,
+                });
+            }
         }
 
         for (int b = 0; b < 20; b++)
@@ -371,13 +405,25 @@ public partial class Game : Node3D
             float x = side * (18f + (float)Rng.NextDouble() * 6f);
             float z = -170f + (float)Rng.NextDouble() * 340f;
             float s = 0.6f + (float)Rng.NextDouble() * 0.6f;
-            AddChild(new MeshInstance3D
+
+            var bush = Glb.Create(bushPath, 1.5f);
+            if (bush != null)
             {
-                Mesh = bushMesh,
-                MaterialOverride = bushMat,
-                Position = new Vector3(x, 0.5f * s, z),
-                Scale = Vector3.One * s,
-            });
+                bush.Position = new Vector3(x, 0f, z);
+                bush.RotationDegrees = new Vector3(0f, (float)Rng.NextDouble() * 360f, 0f);
+                bush.Scale = Vector3.One * s;
+                AddChild(bush);
+            }
+            else
+            {
+                AddChild(new MeshInstance3D
+                {
+                    Mesh = bushMeshFallback,
+                    MaterialOverride = bushMat,
+                    Position = new Vector3(x, 0.5f * s, z),
+                    Scale = Vector3.One * s,
+                });
+            }
         }
     }
 
@@ -418,27 +464,35 @@ public partial class Game : Node3D
             g.AddChild(new MeshInstance3D { Mesh = crate, Position = new Vector3(-3f, 0.9f, 2.6f) });
             g.AddChild(new MeshInstance3D { Mesh = crate, Position = new Vector3(-1.8f, 0.9f, 3.4f), RotationDegrees = new Vector3(0f, 30f, 0f) });
 
-            // wooden fence enclosure with a gate gap toward the road (per concept art spawn pen)
-            var fenceMat = new StandardMaterial3D { AlbedoColor = new Color(0.55f, 0.40f, 0.22f), Roughness = 1f };
-            var postMat = new StandardMaterial3D { AlbedoColor = c.Lightened(0.1f), Roughness = 0.9f };
-            float fH = 1.5f, fT = 0.18f, penR = 7f;
-            var fenceMesh = new BoxMesh { Size = new Vector3(penR * 2, fH, fT), Material = fenceMat };
-            var postMesh = new BoxMesh { Size = new Vector3(0.35f, fH + 0.4f, 0.35f), Material = postMat };
-            // rear + side walls (the front has a gap for the gate)
-            g.AddChild(new MeshInstance3D { Mesh = fenceMesh, Position = new Vector3(0f, fH * 0.5f, -penR) });
-            g.AddChild(new MeshInstance3D
+            // spawn pen enclosure (GLB or procedural fence fallback)
+            string penPath = $"res://assets/glb/spawn_pen_{(team == Team.Blue ? "blue" : "red")}.glb";
+            var pen = Glb.Create(penPath, 4f);
+            if (pen != null)
             {
-                Mesh = new BoxMesh { Size = new Vector3(fT, fH, penR * 2), Material = fenceMat },
-                Position = new Vector3(-penR, fH * 0.5f, 0f),
-            });
-            g.AddChild(new MeshInstance3D
+                pen.Position = new Vector3(0f, 0f, 0f);
+                g.AddChild(pen);
+            }
+            else
             {
-                Mesh = new BoxMesh { Size = new Vector3(fT, fH, penR * 2), Material = fenceMat },
-                Position = new Vector3(penR, fH * 0.5f, 0f),
-            });
-            // gate posts with team-color trim
-            foreach (float gx in new[] { -2.2f, 2.2f })
-                g.AddChild(new MeshInstance3D { Mesh = postMesh, Position = new Vector3(gx, (fH + 0.4f) * 0.5f, penR) });
+                var fenceMat = new StandardMaterial3D { AlbedoColor = new Color(0.55f, 0.40f, 0.22f), Roughness = 1f };
+                var postMat = new StandardMaterial3D { AlbedoColor = c.Lightened(0.1f), Roughness = 0.9f };
+                float fH = 1.5f, fT = 0.18f, penR = 7f;
+                var fenceMesh = new BoxMesh { Size = new Vector3(penR * 2, fH, fT), Material = fenceMat };
+                var postMesh = new BoxMesh { Size = new Vector3(0.35f, fH + 0.4f, 0.35f), Material = postMat };
+                g.AddChild(new MeshInstance3D { Mesh = fenceMesh, Position = new Vector3(0f, fH * 0.5f, -penR) });
+                g.AddChild(new MeshInstance3D
+                {
+                    Mesh = new BoxMesh { Size = new Vector3(fT, fH, penR * 2), Material = fenceMat },
+                    Position = new Vector3(-penR, fH * 0.5f, 0f),
+                });
+                g.AddChild(new MeshInstance3D
+                {
+                    Mesh = new BoxMesh { Size = new Vector3(fT, fH, penR * 2), Material = fenceMat },
+                    Position = new Vector3(penR, fH * 0.5f, 0f),
+                });
+                foreach (float gx in new[] { -2.2f, 2.2f })
+                    g.AddChild(new MeshInstance3D { Mesh = postMesh, Position = new Vector3(gx, (fH + 0.4f) * 0.5f, penR) });
+            }
         }
     }
 
@@ -539,7 +593,7 @@ public partial class Game : Node3D
         b.Fortress.DamageBlock(b, dmg);
     }
 
-    public void AddFx(BlastFx fx) => AddChild(fx);
+    public void AddFx(Node3D fx) => AddChild(fx);
 
     public void Shake(float amount = 0.35f) => _shake = amount;
 

@@ -116,46 +116,55 @@ public partial class LaserFx : Node3D
         float len = dir.Length();
         _mat = new StandardMaterial3D
         {
-            AlbedoColor = new Color(1f, 1f, 1f, 0.9f),
+            AlbedoColor = new Color(1f, 1f, 1f, 0.95f),
             EmissionEnabled = true,
-            Emission = new Color(1f, 0.9f, 0.5f),
-            EmissionEnergyMultiplier = 5f,
+            Emission = new Color(1f, 0.85f, 0.4f),
+            EmissionEnergyMultiplier = 6f,
             Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
             ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
             CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+            NoDepthTest = true,
         };
         _beam = new MeshInstance3D
         {
-            Mesh = new BoxMesh { Size = new Vector3(0.3f, 0.3f, len), Material = _mat },
+            Mesh = new BoxMesh { Size = new Vector3(1.2f, 1.2f, len), Material = _mat },
         };
-        // orient the beam along the direction vector
+        // orient the beam's Z axis (its length) along the direction vector
         if (len > 0.01f)
-            _beam.LookAt(_to - Position, Vector3.Up);
+        {
+            var n = dir / len;
+            // Godot Basis columns are X, Y, Z. We want Z = n.
+            // Pick an arbitrary up that isn't parallel to n.
+            var up = Mathf.Abs(n.Y) < 0.99f ? Vector3.Up : Vector3.Forward;
+            var x = up.Cross(n).Normalized();
+            var y = n.Cross(x).Normalized();
+            _beam.Transform = new Transform3D(new Basis(x, y, n), Vector3.Zero);
+        }
         AddChild(_beam);
     }
 
     public override void _Process(double delta)
     {
         _t += (float)delta;
-        if (_t < 0.06f)
+        // full-bright flash phase: visible at peak for the first 0.15s
+        if (_t < 0.15f)
         {
-            // initial flash: thickest, brightest
-            float k = _t / 0.06f;
-            _beam.Scale = new Vector3(Mathf.Lerp(1.5f, 1f, k), Mathf.Lerp(1.5f, 1f, k), 1f);
-            _mat.EmissionEnergyMultiplier = Mathf.Lerp(6f, 4f, k);
+            _beam.Scale = new Vector3(2f, 2f, 1f);
+            _mat.EmissionEnergyMultiplier = 8f;
+            _mat.AlbedoColor = new Color(1f, 1f, 1f, 0.95f);
         }
         else
         {
-            float fade = 1f - (_t - 0.06f) / 0.18f;
+            float fade = 1f - (_t - 0.15f) / 0.4f;
             if (fade <= 0f)
             {
                 QueueFree();
                 return;
             }
-            float w = Mathf.Lerp(1f, 0.15f, 1f - fade);
+            float w = Mathf.Lerp(2f, 0.2f, 1f - fade);
             _beam.Scale = new Vector3(w, w, 1f);
-            _mat.AlbedoColor = new Color(1f, 0.9f, 0.5f, 0.9f * fade);
-            _mat.EmissionEnergyMultiplier = 4f * fade;
+            _mat.AlbedoColor = new Color(1f, 0.85f, 0.4f, 0.95f * fade);
+            _mat.EmissionEnergyMultiplier = 8f * fade;
         }
     }
 }
@@ -199,19 +208,19 @@ public partial class HitSparkFx : Node3D
         // shockwave ring (flat torus on the ground)
         _ringMat = new StandardMaterial3D
         {
-            AlbedoColor = new Color(1f, 1f, 1f, 0.8f),
+            AlbedoColor = new Color(1f, 1f, 1f, 0.9f),
             EmissionEnabled = true,
             Emission = _color.Lightened(0.4f),
-            EmissionEnergyMultiplier = 3f,
+            EmissionEnergyMultiplier = 4f,
             Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
             ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
             NoDepthTest = true,
         };
         _ring = new MeshInstance3D
         {
-            Mesh = new TorusMesh { InnerRadius = 0.2f, OuterRadius = 0.35f, Material = _ringMat },
+            Mesh = new TorusMesh { InnerRadius = 0.5f, OuterRadius = 0.8f, Material = _ringMat },
             RotationDegrees = new Vector3(90f, 0f, 0f),
-            Position = new Vector3(0f, 0.1f, 0f),
+            Position = new Vector3(0f, 0.15f, 0f),
         };
         AddChild(_ring);
     }
@@ -219,16 +228,16 @@ public partial class HitSparkFx : Node3D
     public override void _Process(double delta)
     {
         _t += (float)delta;
-        float k = Mathf.Min(1f, _t / 0.3f);
-        _ring.Scale = Vector3.One * Mathf.Lerp(1f, 4f, k);
+        float k = Mathf.Min(1f, _t / 0.45f);
+        _ring.Scale = Vector3.One * Mathf.Lerp(1f, 6f, k);
         float fade = 1f - k;
         if (fade <= 0f)
         {
             QueueFree();
             return;
         }
-        _ringMat.AlbedoColor = new Color(1f, 1f, 1f, 0.8f * fade);
-        _ringMat.EmissionEnergyMultiplier = 3f * fade;
+        _ringMat.AlbedoColor = new Color(1f, 1f, 1f, 0.9f * fade);
+        _ringMat.EmissionEnergyMultiplier = 4f * fade;
     }
 }
 
@@ -260,7 +269,7 @@ public partial class DashTrailFx : Node3D
         };
         _trail = new MeshInstance3D
         {
-            Mesh = new BoxMesh { Size = new Vector3(0.8f, 2.4f, 0.3f), Material = _mat },
+            Mesh = new BoxMesh { Size = new Vector3(1.4f, 2.4f, 0.5f), Material = _mat },
             Position = new Vector3(0f, 1.2f, 0f),
         };
         AddChild(_trail);
