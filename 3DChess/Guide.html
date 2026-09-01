@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D 中国象棋 — 开发指南</title>
+<style>
+  :root { --bg:#1a1a24; --panel:#252535; --text:#e0e0e8; --accent:#7c8cff; --warn:#ff9a4a; --ok:#5ac88a; --code:#2a2a3a; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); line-height:1.7; padding:20px; max-width:1000px; margin:0 auto; }
+  h1 { color:var(--accent); font-size:28px; margin-bottom:6px; }
+  h2 { color:var(--accent); font-size:22px; margin:32px 0 12px; border-bottom:1px solid var(--panel); padding-bottom:6px; }
+  h3 { color:var(--warn); font-size:17px; margin:20px 0 8px; }
+  p { margin-bottom:10px; }
+  code { background:var(--code); padding:2px 6px; border-radius:4px; font-family:'Cascadia Code',Consolas,monospace; font-size:13px; color:#c8c8e8; }
+  pre { background:var(--code); padding:14px 16px; border-radius:8px; overflow-x:auto; margin:10px 0; }
+  pre code { background:none; padding:0; font-size:13px; color:#a8c8ff; }
+  table { border-collapse:collapse; width:100%; margin:10px 0; }
+  th,td { border:1px solid var(--panel); padding:8px 12px; text-align:left; }
+  th { background:var(--panel); color:var(--accent); }
+  .card { background:var(--panel); border-radius:10px; padding:18px; margin:14px 0; }
+  .path { color:#88aaff; word-break:break-all; }
+  .note { color:#888; font-size:13px; font-style:italic; }
+  .flow { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:10px 0; }
+  .flow span { background:var(--code); padding:6px 14px; border-radius:20px; font-size:13px; }
+  .flow .arrow { color:var(--accent); font-weight:bold; }
+</style>
+</head>
+<body>
+
+<h1>🎮 3D 中国象棋（Xiangqi3D）— 开发指南</h1>
+<p class="note">引擎：Godot 4.7.1 .NET（C#） · 引擎路径：<code>D:\godogen\Godot_v4.7.1-stable_mono_win64\</code></p>
+
+<div class="card">
+<h3>项目信息</h3>
+<p>项目路径：<code class="path">D:\godogen\3DChess\</code></p>
+<p>主场景：<code>scenes/Main.tscn</code>（由 <code>scenes/BuildMain.cs</code> 构建期生成）</p>
+<p>程序集：<code>Xiangqi3D</code>（.NET 8 / Godot.NET.Sdk 4.7.1）</p>
+<p>窗口分辨率：1280×720 · MSAA 4×</p>
+</div>
+
+<h2>1. 用编辑器打开场景</h2>
+<div class="card">
+<p><strong>方式 A — 命令行：</strong></p>
+<pre><code>"D:\godogen\Godot_v4.7.1-stable_mono_win64\Godot_v4.7.1-stable_mono_win64.exe" --path "D:\godogen\3DChess" -e</code></pre>
+<p><strong>方式 B — 双击 <code>open_3dchess.bat</code></strong>（已生成在 <code>D:\godogen\</code>）</p>
+<p><strong>方式 C — 双击 <code>D:\godogen\3DChess\project.godot</code></strong>（需已关联 .godot 扩展名）</p>
+<p>编辑器打开后，在 FileSystem 面板双击 <code>scenes/Main.tscn</code> 即可看到 3D 棋盘场景。</p>
+<p class="note">Main.tscn 是 BuildMain.cs 打包生成的——如果你修改了 Game.cs 的 _Ready() 中构建环境/棋盘/棋子的代码，需要重新运行 BuildMain 刷新场景。</p>
+<pre><code>"D:\godogen\Godot_v4.7.1-stable_mono_win64\Godot_v4.7.1-stable_mono_win64_console.exe" --headless --path "D:\godogen\3DChess" --script scenes/BuildMain.cs</code></pre>
+</div>
+
+<h2>2. 编译游戏</h2>
+<div class="card">
+<pre><code>cd D:\godogen\3DChess
+dotnet build</code></pre>
+<p>或双击 <code>run_3dchess.bat</code>（自动编译 + 运行）。</p>
+<pre><code># 运行游戏（窗口模式）
+"D:\godogen\Godot_v4.7.1-stable_mono_win64\Godot_v4.7.1-stable_mono_win64_console.exe" --path "D:\godogen\3DChess"
+
+# 首次运行或资产变更后需先导入
+"D:\godogen\Godot_v4.7.1-stable_mono_win64\Godot_v4.7.1-stable_mono_win64_console.exe" --headless --path "D:\godogen\3DChess" --import
+
+# 规则探针验证（21 项断言）
+"D:\godogen\Godot_v4.7.1-stable_mono_win64\Godot_v4.7.1-stable_mono_win64_console.exe" --headless --path "D:\godogen\3DChess" --script test/RulesProbe.cs
+
+# 证明视频捕获
+"D:\godogen\Godot_v4.7.1-stable_mono_win64\Godot_v4.7.1-stable_mono_win64_console.exe" --path "D:\godogen\3DChess" --write-movie screenshots/result/frame.png --fixed-fps 30 --quit-after 900 --script test/Presentation.cs</code></pre>
+</div>
+
+<h2>3. 导出 Web（HTML5）</h2>
+<div class="card">
+<p><strong>前提：</strong>需下载 Godot Web 导出模板（Editor → Editor Manager → Export Templates → Download）。</p>
+<ol>
+  <li>用编辑器打开项目（<code>open_3dchess.bat</code>）</li>
+  <li>菜单 <strong>Project → Export...</strong></li>
+  <li>点 <strong>Add...</strong> → 选 <strong>Web (HTML5)</strong></li>
+  <li>导出路径设为 <code>D:\godogen\3DChess\export\web\</code></li>
+  <li>点 <strong>Export Project</strong></li>
+</ol>
+<p><strong>命令行导出</strong>（需先在编辑器中配置好 export_presets.cfg）：</p>
+<pre><code>"D:\godogen\Godot_v4.7.1-stable_mono_win64\Godot_v4.7.1-stable_mono_win64_console.exe" --headless --path "D:\godogen\3DChess" --export-release "Web" "D:\godogen\3DChess\export\web\index.html"</code></pre>
+<p class="note">⚠ Godot 4.7 C# (Mono) 项目导出 Web 需要 .NET 8 Web 构建工具链。SDFGI / Glow 等高级渲染特性在 WebGL 下可能不支持，导出前建议在 export preset 中关闭 SDFGI。</p>
+</div>
+
+<h2>4. 代码架构</h2>
+<div class="card">
+<table>
+<tr><th>文件</th><th>职责</th></tr>
+<tr><td><code>Rules.cs</code></td><td>规则引擎：走法生成、合法性过滤、将军检测（含飞将）、绝杀/困毙判定</td></tr>
+<tr><td><code>AI.cs</code></td><td>negamax + α-β + 静态搜索 + MVV-LVA 排序 + 迭代加深（~0.9s 时限）</td></tr>
+<tr><td><code>Board.cs</code></td><td>程序化木纹棋盘、网格线、楚河汉界、标记系统（选中/落点/将军/上一步/悬停）</td></tr>
+<tr><td><code>Piece.cs</code></td><td>车削立体棋子几何（底盘→桶身→肩环→穹顶）+ 木纹漆面 + 刻字 + 移动/受击/死亡动画</td></tr>
+<tr><td><code>Game.cs</code></td><td>根节点：相机/灯光/环境（SDFGI+Glow+Filmic+SSAO）、棋子生成、点击拾取、走子流程、AI 调度、悔棋/重开</td></tr>
+<tr><td><code>HUD.cs</code></td><td>CanvasLayer UI：模式选择、回合条、将军闪、终局结算（锚点自适应布局）</td></tr>
+<tr><td><code>FX.cs</code></td><td>程序化木纹纹理生成器 + 碎屑粒子</td></tr>
+<tr><td><code>BuildMain.cs</code></td><td>构建期场景生成（headless 运行一次 → 输出 Main.tscn）</td></tr>
+<tr><td><code>RulesProbe.cs</code></td><td>headless 规则断言探针（21 项，含 AI 合法性验证）</td></tr>
+<tr><td><code>Presentation.cs</code></td><td>确定性证明视频捕获（注入输入 + 截图）</td></tr>
+</table>
+</div>
+
+<h2>5. 游戏流程</h2>
+<div class="card">
+<div class="flow">
+<span>_Ready() 构建世界</span><span class="arrow">→</span>
+<span>BuildEnvironment（天空/GI/灯光/相机）</span><span class="arrow">→</span>
+<span>Board（棋盘/线条/楚河汉界/标记）</span><span class="arrow">→</span>
+<span>SpawnPieces（32 枚棋子）</span><span class="arrow">→</span>
+<span>HUD（模式选择界面）</span>
+</div>
+<div class="flow" style="margin-top:8px">
+<span>玩家点击棋子</span><span class="arrow">→</span>
+<span>规则引擎生成合法落点</span><span class="arrow">→</span>
+<span>玩家点击落点</span><span class="arrow">→</span>
+<span>走子动画</span><span class="arrow">→</span>
+<span>检查将军/绝杀/困毙</span><span class="arrow">→</span>
+<span>AI 思考（后台线程）</span><span class="arrow">→</span>
+<span>AI 走子</span><span class="arrow">→</span>
+<span>循环至终局</span>
+</div>
+</div>
+
+<h2>6. 渲染特性</h2>
+<div class="card">
+<table>
+<tr><th>特性</th><th>配置</th></tr>
+<tr><td>SDFGI 全局光照</td><td>开启，天空光反弹 + 遮挡</td></tr>
+<tr><td>Glow 泛光</td><td>0.5 强度，标记/水晶辉光</td></tr>
+<tr><td>色调映射</td><td>Filmic</td></tr>
+<tr><td>SSAO</td><td>2.5 强度，半径 1.2</td></tr>
+<tr><td>主光</td><td>暖色（1.65），阴影 4096</td></tr>
+<tr><td>补光</td><td>冷色（0.3），无阴影</td></tr>
+<tr><td>雾</td><td>冷色（0.72,0.78,0.88），密度 0.006，FogSkyAffect 0.15</td></tr>
+<tr><td>MSAA</td><td>4×</td></tr>
+</table>
+</div>
+
+<h2>7. 操作说明</h2>
+<div class="card">
+<table>
+<tr><th>操作</th><th>功能</th></tr>
+<tr><td>单指点击 / 鼠标左键</td><td>选中己方棋子 → 显示合法落点 → 点击落点走子</td></tr>
+<tr><td>单指拖动 / 鼠标右键拖动</td><td>旋转视角（俯仰/偏航限位）</td></tr>
+<tr><td>双指捏合 / 滚轮</td><td>缩放视角</td></tr>
+<tr><td>U</td><td>悔棋（人机模式一次撤两手）</td></tr>
+<tr><td>R</td><td>终局后重开</td></tr>
+</table>
+</div>
+
+<h2>8. 快捷方式</h2>
+<div class="card">
+<table>
+<tr><th>文件</th><th>功能</th></tr>
+<tr><td><code>open_3dchess.bat</code></td><td>用编辑器打开 3DChess 项目</td></tr>
+<tr><td><code>run_3dchess.bat</code></td><td>编译 + 运行 3DChess</td></tr>
+<tr><td><code>build_scenes.bat</code></td><td>重新生成两项目的 Main.tscn</td></tr>
+</table>
+<p>以上 bat 文件位于 <code>D:\godogen\</code> 根目录，双击即可运行。</p>
+</div>
+
+<p class="note" style="margin-top:30px">生成时间：2026-09-01</p>
+
+</body>
+</html>
