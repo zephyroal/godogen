@@ -35,6 +35,14 @@ public partial class Game : Node3D
     public float Yaw, Pitch = 0.88f, Dist = 14.2f;
     private readonly Vector3 _camTarget = new(0f, 0f, 0.3f);
 
+    // cinematic focus: zooms in on a point, holds, then eases back
+    private Vector3 _focusPos = new(0f, 0f, 0.3f);
+    private float _focusDist = 14.2f;
+    private float _focusTimer;          // >0 = active; counts down in _Process
+    private const float FocusHoldTime = 1.2f;
+    private const float FocusZoomDist = 6.0f;
+    private float _camEaseSpeed = 6f;
+
     public override void _Ready()
     {
         Instance = this;
@@ -127,6 +135,7 @@ public partial class Game : Node3D
     public override void _Process(double delta)
     {
         float dt = (float)delta;
+        if (_focusTimer > 0f) _focusTimer -= dt;
         UpdateCamera();
 
         // move animation completion: landing dust, then post-move logic
@@ -170,12 +179,31 @@ public partial class Game : Node3D
     {
         Pitch = Mathf.Clamp(Pitch, 0.45f, 1.35f);
         Dist = Mathf.Clamp(Dist, 7f, 20f);
+
+        // determine effective target and distance
+        Vector3 tgt;
+        float effDist;
+        if (_focusTimer > 0f)
+        {
+            tgt = _focusPos;
+            effDist = FocusZoomDist;
+        }
+        else
+        {
+            tgt = _camTarget;
+            effDist = Dist;
+        }
+
         var off = new Vector3(
             Mathf.Sin(Yaw) * Mathf.Cos(Pitch),
             Mathf.Sin(Pitch),
-            Mathf.Cos(Yaw) * Mathf.Cos(Pitch)) * Dist;
-        Cam.Position = _camTarget + off;
-        Cam.LookAt(_camTarget, Vector3.Up);
+            Mathf.Cos(Yaw) * Mathf.Cos(Pitch)) * effDist;
+
+        // smooth lerp — use the frame delta from the scene tree
+        float dt = (float)GetProcessDeltaTime();
+        float k = Mathf.Min(1f, dt * _camEaseSpeed);
+        Cam.Position = Cam.Position.Lerp(tgt + off, k);
+        Cam.LookAt(Cam.Position - off, Vector3.Up); // look at the target, not camera-self
     }
 
     // ---- input: taps via (emulated) left click; camera via touch drag / pinch / right-drag / wheel ----
@@ -341,6 +369,11 @@ public partial class Game : Node3D
             var timer = GetTree().CreateTimer(1.2f);
             timer.Timeout += burst.QueueFree;
             victim.AnimateCapture(TraySlot(victim));
+
+            // cinematic camera: zoom in on the capture point
+            _focusPos = w + new Vector3(0f, 0f, 0f);
+            _focusDist = FocusZoomDist;
+            _focusTimer = FocusHoldTime;
         }
         mover.AnimateMove(Board.WorldOf(m.To), victim != null);
         _movingPiece = mover;

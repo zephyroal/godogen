@@ -112,6 +112,10 @@ public partial class Piece : Node3D
         // re-measure after scale and align: bottom at y=0, center on XZ
         aabb = GetAabb(instance);
         instance.Position = new Vector3(-aabb.Position.X - aabb.Size.X * 0.5f, -aabb.Position.Y, -aabb.Position.Z - aabb.Size.Z * 0.5f);
+
+        // orient: red faces north (toward black), black faces south (toward red)
+        if (Side == Side.Red)
+            instance.RotateY(Mathf.Pi);
     }
 
     private static Aabb GetAabb(Node3D root)

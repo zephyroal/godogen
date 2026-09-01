@@ -47,6 +47,7 @@ public partial class Game : Node3D
     public HUD Hud { get; private set; }
     public float SpawnZ { get; private set; }
     public bool GameOver { get; private set; }
+    public float PlayerSpawnZ { get; private set; } // set after BuildFortresses
 
     private Camera3D _cam;
     private DirectionalLight3D _sun;
@@ -268,6 +269,18 @@ public partial class Game : Node3D
 
         BuildScenery();
         BuildCamps();
+        BuildLandmarkCastle();
+    }
+
+    /// <summary>Distant decorative castle at the far end of the road (per concept art).</summary>
+    private void BuildLandmarkCastle()
+    {
+        var landmark = Glb.Create("res://assets/glb/castle_red.glb", 20f);
+        if (landmark != null)
+        {
+            landmark.Position = new Vector3(0f, 0f, -SpawnZ + 8f);
+            AddChild(landmark);
+        }
     }
 
     /// <summary>Trees and rocks along the outer strips, flanking the battlefield (concept art scenery).</summary>
@@ -326,6 +339,46 @@ public partial class Game : Node3D
             };
             AddChild(rock);
         }
+
+        // broadleaf trees and bushes (concept art has two tree types + shrubs)
+        var bTrunkMat = new StandardMaterial3D { AlbedoColor = new Color(0.38f, 0.27f, 0.15f), Roughness = 1f };
+        var bLeafMat1 = new StandardMaterial3D { AlbedoColor = new Color(0.35f, 0.58f, 0.28f), Roughness = 1f };
+        var bLeafMat2 = new StandardMaterial3D { AlbedoColor = new Color(0.42f, 0.63f, 0.32f), Roughness = 1f };
+        var bushMat = new StandardMaterial3D { AlbedoColor = new Color(0.28f, 0.50f, 0.24f), Roughness = 1f };
+        var bTrunkMesh = new BoxMesh { Size = new Vector3(0.8f, 2.0f, 0.8f), Material = bTrunkMat };
+        var bLeafMesh = new SphereMesh { Radius = 1.6f, Height = 3.2f, RadialSegments = 8, Rings = 4 };
+        var bushMesh = new SphereMesh { Radius = 0.7f, Height = 1.4f, RadialSegments = 6, Rings = 3 };
+
+        for (int t = 0; t < 12; t++)
+        {
+            float side = t % 2 == 0 ? 1f : -1f;
+            float x = side * (21f + (float)Rng.NextDouble() * 4f);
+            float z = -170f + (float)Rng.NextDouble() * 340f;
+            float s = 0.9f + (float)Rng.NextDouble() * 0.5f;
+            AddChild(new MeshInstance3D { Mesh = bTrunkMesh, Position = new Vector3(x, 1.0f * s, z), Scale = Vector3.One * s });
+            AddChild(new MeshInstance3D
+            {
+                Mesh = bLeafMesh,
+                MaterialOverride = t % 2 == 0 ? bLeafMat1 : bLeafMat2,
+                Position = new Vector3(x, (2.0f + 1.2f) * s, z),
+                Scale = Vector3.One * s,
+            });
+        }
+
+        for (int b = 0; b < 20; b++)
+        {
+            float side = b % 2 == 0 ? 1f : -1f;
+            float x = side * (18f + (float)Rng.NextDouble() * 6f);
+            float z = -170f + (float)Rng.NextDouble() * 340f;
+            float s = 0.6f + (float)Rng.NextDouble() * 0.6f;
+            AddChild(new MeshInstance3D
+            {
+                Mesh = bushMesh,
+                MaterialOverride = bushMat,
+                Position = new Vector3(x, 0.5f * s, z),
+                Scale = Vector3.One * s,
+            });
+        }
     }
 
     /// <summary>Team camps at each end of the map: stone platform, flag pole with team banner, supply crates.</summary>
@@ -338,7 +391,7 @@ public partial class Game : Node3D
         var pole = new BoxMesh { Size = new Vector3(0.28f, 7f, 0.28f), Material = poleMat };
         var crate = new BoxMesh { Size = new Vector3(1.2f, 1.2f, 1.2f), Material = crateMat };
 
-        foreach (var (team, cx, cz) in new[] { (Team.Blue, -10.5f, SpawnZ + 6f), (Team.Red, 10.5f, SpawnZ + 6f) })
+        foreach (var (team, cx, cz) in new[] { (Team.Blue, -10.5f, PlayerSpawnZ + 6f), (Team.Red, 10.5f, PlayerSpawnZ + 6f) })
         {
             var c = ColorOf(team);
             var g = new Node3D { Position = new Vector3(cx, 0f, cz) };
@@ -364,6 +417,28 @@ public partial class Game : Node3D
             });
             g.AddChild(new MeshInstance3D { Mesh = crate, Position = new Vector3(-3f, 0.9f, 2.6f) });
             g.AddChild(new MeshInstance3D { Mesh = crate, Position = new Vector3(-1.8f, 0.9f, 3.4f), RotationDegrees = new Vector3(0f, 30f, 0f) });
+
+            // wooden fence enclosure with a gate gap toward the road (per concept art spawn pen)
+            var fenceMat = new StandardMaterial3D { AlbedoColor = new Color(0.55f, 0.40f, 0.22f), Roughness = 1f };
+            var postMat = new StandardMaterial3D { AlbedoColor = c.Lightened(0.1f), Roughness = 0.9f };
+            float fH = 1.5f, fT = 0.18f, penR = 7f;
+            var fenceMesh = new BoxMesh { Size = new Vector3(penR * 2, fH, fT), Material = fenceMat };
+            var postMesh = new BoxMesh { Size = new Vector3(0.35f, fH + 0.4f, 0.35f), Material = postMat };
+            // rear + side walls (the front has a gap for the gate)
+            g.AddChild(new MeshInstance3D { Mesh = fenceMesh, Position = new Vector3(0f, fH * 0.5f, -penR) });
+            g.AddChild(new MeshInstance3D
+            {
+                Mesh = new BoxMesh { Size = new Vector3(fT, fH, penR * 2), Material = fenceMat },
+                Position = new Vector3(-penR, fH * 0.5f, 0f),
+            });
+            g.AddChild(new MeshInstance3D
+            {
+                Mesh = new BoxMesh { Size = new Vector3(fT, fH, penR * 2), Material = fenceMat },
+                Position = new Vector3(penR, fH * 0.5f, 0f),
+            });
+            // gate posts with team-color trim
+            foreach (float gx in new[] { -2.2f, 2.2f })
+                g.AddChild(new MeshInstance3D { Mesh = postMesh, Position = new Vector3(gx, (fH + 0.4f) * 0.5f, penR) });
         }
     }
 
@@ -385,6 +460,7 @@ public partial class Game : Node3D
             z += depth + 4f;
         }
         SpawnZ = z + 3f;
+        PlayerSpawnZ = SpawnZ; // both teams spawn south of the last fortress, run north
     }
 
     private void SpawnRunners()
@@ -393,7 +469,7 @@ public partial class Game : Node3D
         {
             var r = new Runner(t, isPlayer: player);
             r.TargetLane = lane;
-            r.Position = new Vector3(Game.LaneX[lane], 0f, Game.FrontlineSpawnZ + zOff);
+            r.Position = new Vector3(Game.LaneX[lane], 0f, Game.Instance.PlayerSpawnZ + zOff);
             AddChild(r);
             Runners.Add(r);
             return r;
@@ -453,7 +529,7 @@ public partial class Game : Node3D
             if (d < bestD) { bestD = d; best = f; }
         }
         if (best != null) return best.RespawnPoint();
-        return new Vector3(LaneX[LaneBase(r.Team) + 1], 0f, SpawnZ);
+        return new Vector3(LaneX[LaneBase(r.Team) + 1], 0f, PlayerSpawnZ);
     }
 
     // ---- combat plumbing ----

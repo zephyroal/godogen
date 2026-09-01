@@ -52,9 +52,10 @@ public partial class Fortress : Node3D
 
         float zFront = ZMax; // approach side: both teams come from +Z (south)
 
-        // the #10 main city grows a GLB castle keep at its center — wall cells under its footprint make way
-        Vector3 keepHalf = Index == Game.FortressCount
-            ? Glb.ScaledHalfExtents(CastlePath(), Game.CastleHeight)
+        // the #1 outpost and #10 main city both grow a GLB castle keep — wall cells under its footprint make way
+        bool hasKeep = Index == 1 || Index == Game.FortressCount;
+        Vector3 keepHalf = hasKeep
+            ? Glb.ScaledHalfExtents(CastlePath(), Index == 1 ? 8f : Game.CastleHeight)
             : Vector3.Zero;
 
         for (int r = 0; r < rows; r++)
@@ -93,6 +94,9 @@ public partial class Fortress : Node3D
         // glowing gate portal at the fortress entrance (middle lane, enemy-facing edge)
         BuildGate(zFront, baseLane);
 
+        // curtain walls connect the four corner pillars into a compound (per concept art)
+        BuildWalls(rng, baseLane, zFront);
+
         // corner pillars (outside the lanes — target practice + HP pool, capped with battlements).
         // The gate-side pair becomes GLB watchtowers; the rear pair stays blocky target practice.
         float[] pillarX =
@@ -128,10 +132,11 @@ public partial class Fortress : Node3D
             AddBattlement(px, zRear);
         }
 
-        // the ultimate main city rises a GLB castle keep at its center (golden crown as fallback)
-        if (Index == Game.FortressCount)
+        // the #1 outpost and #10 main city both get a GLB castle keep (home landmark + objective)
+        if (Index == 1 || Index == Game.FortressCount)
         {
-            var keep = Glb.Create(CastlePath(), Game.CastleHeight);
+            float keepHeight = Index == 1 ? 8f : Game.CastleHeight;
+            var keep = Glb.Create(CastlePath(), keepHeight);
             if (keep != null)
             {
                 keep.Position = new Vector3(Game.LaneX[baseLane + 1], 0f, CenterZ);
@@ -297,6 +302,36 @@ public partial class Fortress : Node3D
         });
     }
 
+    /// <summary>Curtain walls linking the four corner pillars into a compound, with a gate gap on the road side.</summary>
+    private void BuildWalls(System.Random rng, int baseLane, float zFront)
+    {
+        float outerX = Game.LaneX[baseLane] - 3.5f;
+        float innerX = (Game.LaneX[baseLane + 1] + Game.LaneX[baseLane + 2]) * 0.5f;
+        float zRear = (ZMin + ZMax) - zFront;
+        float wallY = 1.5f;
+        float wallH = 3f;
+        float wallT = 0.6f;
+        var mat = WallMat(rng);
+        void Wall(float x, float z, float sx, float sz)
+        {
+            var b = MakeBlock(x, wallY, z, mat, hp: 30f, laneIdx: -1, isCore: false);
+            b.Scale = new Vector3(sx / Game.BlockSize, wallH / Game.BlockSize, sz / Game.BlockSize);
+        }
+        // Z-aligned walls (front and rear, split around the gate gap on the road side)
+        float gapHalf = 2.8f; // gate opening half-width
+        float midX = (outerX + innerX) * 0.5f;
+        float frontLenL = Mathf.Max(0.1f, midX - gapHalf - outerX);
+        float frontLenR = Mathf.Max(0.1f, innerX - (midX + gapHalf));
+        // front wall (road side, zFront)
+        if (frontLenL > 0.5f) Wall((outerX + midX - gapHalf) * 0.5f, zFront, frontLenL, wallT);
+        if (frontLenR > 0.5f) Wall((midX + gapHalf + innerX) * 0.5f, zFront, frontLenR, wallT);
+        // rear wall (no gap needed)
+        Wall(midX, zRear, innerX - outerX, wallT);
+        // X-aligned side walls (connecting front to rear along outer and inner edges)
+        Wall(outerX, (zFront + zRear) * 0.5f, wallT, zRear - zFront);
+        Wall(innerX, (zFront + zRear) * 0.5f, wallT, zRear - zFront);
+    }
+
     /// <summary>Battlement cap on top of a pillar (decorative).</summary>
     private void AddBattlement(float px, float pz)
     {
@@ -376,21 +411,32 @@ public partial class Fortress : Node3D
             Game.Instance?.AddChild(FX.BlockBurst(new Vector3(_keepBase.X, 6f, _keepBase.Z), Game.ColorOf(Team), 26));
         }
 
-        // rubble: flat gray boxes, purely visual, never block lanes
-        var rubbleMat = new StandardMaterial3D { AlbedoColor = new Color(0.45f, 0.45f, 0.47f), Roughness = 1f };
-        int baseLane = Game.LaneBase(Team);
-        for (int i = 0; i < 9; i++)
+        // rubble: broken wall fragments and shattered pillars (visual, never blocks lanes)
+        var rubbleMat = new StandardMaterial3D { AlbedoColor = new Color(0.42f, 0.42f, 0.44f), Roughness = 1f };
+        var teamRubbleMat = new StandardMaterial3D
         {
+            AlbedoColor = new Color(Game.ColorOf(Team).R * 0.4f, Game.ColorOf(Team).G * 0.4f, Game.ColorOf(Team).B * 0.4f),
+            Roughness = 1f,
+        };
+        int baseLane = Game.LaneBase(Team);
+        float outerX = Game.LaneX[baseLane] - 3.5f;
+        float innerX = (Game.LaneX[baseLane + 1] + Game.LaneX[baseLane + 2]) * 0.5f;
+        var rng = Game.Instance?.Rng ?? new System.Random();
+        for (int i = 0; i < 14; i++)
+        {
+            bool isPillar = i % 3 == 0;
+            float x = Mathf.Lerp(outerX, innerX, (float)rng.NextDouble());
+            float z = Mathf.Lerp(ZMin, ZMax, (float)rng.NextDouble());
+            float h = isPillar ? 1.2f + (float)rng.NextDouble() * 1.5f : 0.3f + (float)rng.NextDouble() * 0.5f;
+            float w = isPillar ? 0.6f : 1.2f + (float)rng.NextDouble() * 0.8f;
+            float d = isPillar ? 0.6f : 0.8f + (float)rng.NextDouble() * 0.6f;
+            float tilt = isPillar ? (float)rng.NextDouble() * 30f - 15f : (float)rng.NextDouble() * 20f;
             var r = new MeshInstance3D
             {
-                Mesh = SharedBox(),
-                MaterialOverride = rubbleMat,
-                Position = new Vector3(
-                    Game.LaneX[baseLane + i % 3] + (i - 4) * 0.4f,
-                    0.2f,
-                    Mathf.Lerp(ZMin, ZMax, (i + 0.5f) / 9f)),
-                RotationDegrees = new Vector3(0f, i * 37f, 0f),
-                Scale = new Vector3(0.5f, 0.12f, 0.5f),
+                Mesh = new BoxMesh { Size = new Vector3(w, h, d) },
+                MaterialOverride = i % 4 == 0 ? teamRubbleMat : rubbleMat,
+                Position = new Vector3(x, h * 0.5f, z),
+                RotationDegrees = new Vector3(tilt, (float)rng.NextDouble() * 180f, tilt * 0.5f),
                 CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
             };
             AddChild(r);

@@ -37,7 +37,7 @@ public partial class Runner : Node3D
         Hp = MaxHp;
         int lane = Game.LaneBase(team) + 1;
         TargetLane = lane;
-        Position = new Vector3(Game.LaneX[lane], 0f, Game.FrontlineSpawnZ); // both spawn at +Z
+        Position = new Vector3(Game.LaneX[lane], 0f, Game.Instance.PlayerSpawnZ); // both spawn at south end
     }
 
     public override void _Ready()
@@ -335,6 +335,7 @@ public partial class Runner : Node3D
         BlastCdTimer = Game.BlastCd;
         BlastCount++;
         var center = Position + new Vector3(0f, 1.6f, Heading * 3.5f);
+        Game.Instance.AddFx(new LaserFx(Position + new Vector3(0f, 1.4f, 0f), center, Game.ColorOf(Team)));
         Game.Instance.AddFx(new BlastFx(center, Game.BlastRadius));
         Game.Instance.Shake(0.35f);
 
@@ -361,6 +362,7 @@ public partial class Runner : Node3D
         Dashing = true;
         DashTimer = Game.DashTime;
         _dashVictims.Clear();
+        Game.Instance.AddFx(new DashTrailFx(Position + new Vector3(0f, 0f, Heading * 1.5f), Game.ColorOf(Team)));
     }
 
     private void RamEnemies()
@@ -372,6 +374,7 @@ public partial class Runner : Node3D
             {
                 _dashVictims.Add(r);
                 r.TakeDamage(Game.DashRunnerDmg, Heading);
+                Game.Instance.AddFx(new HitSparkFx(r.Position + new Vector3(0f, 1.2f, 0f), Game.ColorOf(r.Team)));
             }
         }
     }
@@ -386,6 +389,7 @@ public partial class Runner : Node3D
         RegenTimer = 0f;
         Position += new Vector3(0f, 0f, knockDir * 0.8f);
         _body.Scale = new Vector3(1.25f, 1.25f, 1.25f); // hit pop
+        Game.Instance.AddFx(new HitSparkFx(Position + new Vector3(0f, 1.2f, 0f), Game.ColorOf(Team)));
         if (Hp <= 0f) Die();
     }
 
