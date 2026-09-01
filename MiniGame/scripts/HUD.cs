@@ -26,6 +26,7 @@ public partial class HUD : CanvasLayer
     private float _prevHp;
     private Control _startOverlay;
     public bool GameStarted { get; private set; }
+    public void SetStart() => GameStarted = true;
 
     private static StyleBoxFlat SqStyle(Color fill, Color border)
     {

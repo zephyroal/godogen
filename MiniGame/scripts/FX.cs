@@ -45,6 +45,7 @@ public static class FX
 public partial class BlastFx : Node3D
 {
     private MeshInstance3D _sphere;
+    private OmniLight3D _light;
     private float _t;
     private readonly float _radius;
 
@@ -72,6 +73,17 @@ public partial class BlastFx : Node3D
         };
         AddChild(_sphere);
 
+        // dynamic point light: the blast briefly illuminates nearby walls and characters
+        _light = new OmniLight3D
+        {
+            LightColor = new Color(1f, 0.75f, 0.35f),
+            LightEnergy = 6f,
+            OmniRange = _radius * 1.2f,
+            OmniAttenuation = 1.0f,
+            ShadowEnabled = false,
+        };
+        AddChild(_light);
+
         var debris = FX.BlockBurst(Vector3.Zero, new Color(1f, 0.75f, 0.35f), 18);
         AddChild(debris);
     }
@@ -81,6 +93,8 @@ public partial class BlastFx : Node3D
         _t += (float)delta;
         float k = Mathf.Min(1f, _t / 0.28f);
         _sphere.Scale = Vector3.One * Mathf.Lerp(0.2f, _radius * 0.9f, k);
+        if (_light != null)
+            _light.LightEnergy = 6f * (1f - k * 0.7f); // fades with the blast
         if (_t > 0.28f)
         {
             float fade = 1f - (_t - 0.28f) / 0.25f;
@@ -141,6 +155,17 @@ public partial class LaserFx : Node3D
             _beam.Transform = new Transform3D(new Basis(x, y, n), Vector3.Zero);
         }
         AddChild(_beam);
+
+        // dynamic point light at the impact point
+        AddChild(new OmniLight3D
+        {
+            Position = _to - Position, // local offset to the target end
+            LightColor = new Color(1f, 0.85f, 0.4f),
+            LightEnergy = 4f,
+            OmniRange = 5f,
+            OmniAttenuation = 1.0f,
+            ShadowEnabled = false,
+        });
     }
 
     public override void _Process(double delta)
@@ -223,6 +248,16 @@ public partial class HitSparkFx : Node3D
             Position = new Vector3(0f, 0.15f, 0f),
         };
         AddChild(_ring);
+
+        // dynamic point light: the impact briefly flashes nearby surfaces
+        AddChild(new OmniLight3D
+        {
+            LightColor = _color.Lightened(0.4f),
+            LightEnergy = 3f,
+            OmniRange = 4f,
+            OmniAttenuation = 1.0f,
+            ShadowEnabled = false,
+        });
     }
 
     public override void _Process(double delta)

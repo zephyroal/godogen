@@ -91,6 +91,18 @@ public partial class Fortress : Node3D
 		Core.Scale = new Vector3(0.87f, 0.73f, 0.87f);
 		Core.RotationDegrees = new Vector3(0f, 45f, 0f);
 
+		// dynamic point light: the core crystal glows and illuminates its surroundings
+		var coreColor = Game.ColorOf(Team);
+		AddChild(new OmniLight3D
+		{
+			Position = new Vector3(Game.LaneX[baseLane + 1], 2.2f, coreZ),
+			LightColor = coreColor,
+			LightEnergy = 1.8f,
+			OmniRange = 6f,
+			OmniAttenuation = 1.2f,
+			ShadowEnabled = false,
+		});
+
 		// glowing gate portal at the fortress entrance (middle lane, enemy-facing edge)
 		BuildGate(zFront, baseLane);
 
@@ -299,6 +311,17 @@ public partial class Fortress : Node3D
         {
             Mesh = new BoxMesh { Size = new Vector3(0.22f, height - 0.6f, 4f), Material = glowMat },
             Position = new Vector3(roadX, (height - 0.6f) * 0.5f, gateZ),
+        });
+
+        // dynamic point light: the gate portal casts team-color light on nearby walls
+        AddChild(new OmniLight3D
+        {
+            Position = new Vector3(roadX, height * 0.5f, gateZ),
+            LightColor = c,
+            LightEnergy = 2.5f,
+            OmniRange = 8f,
+            OmniAttenuation = 1.5f,
+            ShadowEnabled = false,
         });
     }
 
