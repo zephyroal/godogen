@@ -499,6 +499,7 @@ public partial class Game : Node3D
     {
         if (!GameStarted || GameOver || _movingPiece != null || _aiTask != null || Position.History.Count == 0) return;
         if (_pendingAiMove != null) return;
+        if (CurrentMode == Mode.OnlineHost || CurrentMode == Mode.OnlineGuest) return; // no undo in online
         Audio.Play("undo");
 
         int plies = CurrentMode == Mode.VsAI

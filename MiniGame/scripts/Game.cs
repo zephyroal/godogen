@@ -5,6 +5,8 @@ namespace FortressRush;
 
 public enum Team { Blue, Red }
 
+public enum GameMode { Solo, SpectatorHost, SpectatorGuest }
+
 /// <summary>Root of the match: builds the world, holds registries, drives camera/HUD/game flow.</summary>
 public partial class Game : Node3D
 {
@@ -47,6 +49,8 @@ public partial class Game : Node3D
     public Runner Player { get; private set; }
     public HUD Hud { get; private set; }
     public AudioPlayer Audio { get; private set; }
+    public NetworkManager Net { get; private set; }
+    public GameMode CurrentMode { get; private set; } = GameMode.Solo;
     public float SpawnZ { get; private set; }
     public bool GameOver { get; private set; }
     public float PlayerSpawnZ { get; private set; } // set after BuildFortresses
@@ -98,10 +102,12 @@ public partial class Game : Node3D
         AddChild(Hud);
         Audio = new AudioPlayer();
         AddChild(Audio);
+
+        Net = new NetworkManager { Name = "Network" };
+        AddChild(Net);
         if (OS.IsDebugBuild())
             AddChild(new Fps { Name = "Fps" }); // release builds: no node, zero overhead
         PrePositionCamera();
-        Hud.Announce("摧毁红方 10 号终极主城即可获胜！", 4f);
 
         bool bake = false;
         foreach (var a in OS.GetCmdlineUserArgs()) bake |= a == "--bake";
@@ -140,9 +146,9 @@ public partial class Game : Node3D
         }
         else
         {
-            // elevated chase cam: ~55° pitch, player's back visible, horizon at top (per concept art)
+            // elevated chase cam: ~20° down pitch, horizon visible at top, player in lower third (per concept art)
             int heading = Player != null ? Player.Heading : -1;
-            var camTarget = focus + new Vector3(0f, 17f, -heading * 14f);
+            var camTarget = focus + new Vector3(0f, 12f, -heading * 18f);
             _cam.Position = _cam.Position.Lerp(camTarget, Mathf.Min(1f, dt * 5f));
             if (_shake > 0f)
             {
@@ -150,7 +156,7 @@ public partial class Game : Node3D
                 float a = Mathf.Max(0f, _shake / 0.35f) * 0.6f;
                 _cam.Position += new Vector3(Rng.NextSingle() - 0.5f, (Rng.NextSingle() - 0.5f) * 0.5f, Rng.NextSingle() - 0.5f) * a;
             }
-            _cam.LookAt(focus + new Vector3(0f, 1.5f, heading * 10f), Vector3.Up);
+            _cam.LookAt(focus + new Vector3(0f, 1.5f, heading * 12f), Vector3.Up);
             _sun.Position = focus + new Vector3(0f, 40f, 0f);
         }
 
@@ -181,8 +187,8 @@ public partial class Game : Node3D
             AmbientLightEnergy = 0.55f,
             FogEnabled = true,
             FogLightColor = new Color(0.75f, 0.80f, 0.90f),
-            FogDensity = 0.002f,
-            FogSkyAffect = 0.35f,
+            FogDensity = 0.001f,
+            FogSkyAffect = 0.1f,
             SsaoEnabled = true,
             SsaoIntensity = 3.0f,
             SdfgiEnabled = true,
@@ -619,8 +625,8 @@ public partial class Game : Node3D
     private void PrePositionCamera()
     {
         if (Player == null) return;
-        _cam.Position = Player.Position + new Vector3(0f, 17f, -Player.Heading * 14f);
-        _cam.LookAt(Player.Position + new Vector3(0f, 1.5f, Player.Heading * 10f), Vector3.Up);
+        _cam.Position = Player.Position + new Vector3(0f, 12f, -Player.Heading * 18f);
+        _cam.LookAt(Player.Position + new Vector3(0f, 1.5f, Player.Heading * 12f), Vector3.Up);
     }
 
     // ---- queries used by runners ----
@@ -724,5 +730,66 @@ public partial class Game : Node3D
             names.Add($"{(loser == Team.Blue ? "蓝" : "红")}{f.Index}");
         Hud.ShowEndScreen(winner == Team.Blue, names);
         Audio?.Play(winner == Team.Blue ? "victory" : "defeat");
+
+        if (Net?.IsHost == true && Multiplayer.HasMultiplayerPeer())
+            Rpc(nameof(RpcGameEnd), winner == Team.Blue);
+    }
+
+    // ---- online: spectator mode ----
+
+    public void ChooseMode(GameMode mode)
+    {
+        CurrentMode = mode;
+        if (mode == GameMode.SpectatorGuest)
+        {
+            // guest: disable player input, free-cam only
+            if (Player != null) Player.IsPlayer = false;
+        }
+    }
+
+    private float _snapTimer;
+    private const float SnapshotInterval = 0.05f;
+
+    public override void _PhysicsProcess(double delta)
+    {
+        if (CurrentMode == GameMode.SpectatorHost && Net?.IsOnline == true)
+        {
+            _snapTimer += (float)delta;
+            if (_snapTimer >= SnapshotInterval)
+            {
+                _snapTimer = 0f;
+                SendSnapshot();
+            }
+        }
+    }
+
+    /// <summary>Host sends a compact game-state snapshot to the spectator.</summary>
+    private void SendSnapshot()
+    {
+        // send player position + nearest fortress HPs (compact)
+        float px = Player != null ? Player.Position.X : 0f;
+        float pz = Player != null ? Player.Position.Z : 0f;
+        Rpc(nameof(RpcSnapshot), px, pz, (int)(Player?.Hp ?? 0));
+    }
+
+    [Rpc(MultiplayerApi.RpcMode.Authority, CallLocal = false, TransferMode = MultiplayerPeer.TransferModeEnum.UnreliableOrdered)]
+    public void RpcSnapshot(float px, float pz, int hp)
+    {
+        // guest: move the camera to follow the host's player position
+        if (CurrentMode != GameMode.SpectatorGuest) return;
+        if (Player != null)
+            Player.Position = new Vector3(px, 0f, pz);
+    }
+
+    [Rpc(MultiplayerApi.RpcMode.Authority, CallLocal = false, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    public void RpcGameEnd(bool blueWon)
+    {
+        if (CurrentMode != GameMode.SpectatorGuest) return;
+        var destroyed = new List<string>();
+        foreach (var f in Fortresses)
+            if (f.Destroyed && f.Team == (blueWon ? Team.Red : Team.Blue))
+                destroyed.Add($"{(blueWon ? "红" : "蓝")}{f.Index}");
+        Hud.ShowEndScreen(blueWon, destroyed);
+        Audio?.Play(blueWon ? "victory" : "defeat");
     }
 }

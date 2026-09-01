@@ -166,8 +166,6 @@ public partial class HUD : CanvasLayer
         hint.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter;
         box.AddChild(hint);
 
-        // staggered slide+fade entrance
-        UIAnimator.StaggerIn(new Control[] { title, sub, BtnVsAI, BtnTwo, btnOnline, hint }, 0.08f, 0.35f);
         BtnVsAI.Pressed += () => { UIAnimator.FadeOut(_startOverlay, 0.2f, true); Game.Instance?.ChooseMode(Game.Mode.VsAI); };
         BtnTwo.Pressed += () => { UIAnimator.FadeOut(_startOverlay, 0.2f, true); Game.Instance?.ChooseMode(Game.Mode.TwoPlayers); };
 
@@ -180,6 +178,9 @@ public partial class HUD : CanvasLayer
         netPanel.Init(Game.Instance.Net);
 
         btnOnline.Pressed += () => { netPanel.Visible = true; UIAnimator.FadeIn(netPanel, 0.2f); };
+
+        // staggered slide+fade entrance
+        UIAnimator.StaggerIn(new Control[] { title, sub, BtnVsAI, BtnTwo, btnOnline, hint }, 0.08f, 0.35f);
 
         AddChild(_startOverlay);
     }

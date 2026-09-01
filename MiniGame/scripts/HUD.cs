@@ -24,6 +24,8 @@ public partial class HUD : CanvasLayer
     private float _announceT, _helpT;
     private float _prevBlastCd, _prevDashCd;
     private float _prevHp;
+    private Control _startOverlay;
+    public bool GameStarted { get; private set; }
 
     private static StyleBoxFlat SqStyle(Color fill, Color border)
     {
@@ -127,6 +129,53 @@ public partial class HUD : CanvasLayer
         AddChild(_respawn);
 
         BuildEndScreen();
+        BuildStartOverlay();
+    }
+
+    private void BuildStartOverlay()
+    {
+        _startOverlay = new Control();
+        _startOverlay.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        var dim = new ColorRect { Color = new Color(0f, 0f, 0f, 0.72f) };
+        dim.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        _startOverlay.AddChild(dim);
+
+        var box = new VBoxContainer();
+        box.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        box.Alignment = BoxContainer.AlignmentMode.Center;
+        box.AddThemeConstantOverride("separation", 20);
+        _startOverlay.AddChild(box);
+
+        var title = Shadowed(MkLabel("堡垒冲刺", 56, new Color(1f, 0.88f, 0.4f), HorizontalAlignment.Center), new Color(0f, 0f, 0f, 0.8f));
+        title.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter;
+        box.AddChild(title);
+
+        var startBtn = new Button { Text = "开始游戏", CustomMinimumSize = new Vector2(250, 70) };
+        startBtn.AddThemeFontOverride("font", FX.UiFont());
+        startBtn.AddThemeFontSizeOverride("font_size", 26);
+        startBtn.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter;
+        startBtn.Pressed += () => { GameStarted = true; UIAnimator.FadeOut(_startOverlay, 0.2f, true); Game.Instance?.Hud?.Announce("摧毁红方 10 号终极主城即可获胜！", 4f); };
+        box.AddChild(startBtn);
+
+        var spectateBtn = new Button { Text = "联机观战", CustomMinimumSize = new Vector2(250, 70) };
+        spectateBtn.AddThemeFontOverride("font", FX.UiFont());
+        spectateBtn.AddThemeFontSizeOverride("font_size", 26);
+        spectateBtn.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter;
+        box.AddChild(spectateBtn);
+
+        var netPanel = new NetworkPanel { Visible = false };
+        _startOverlay.AddChild(netPanel);
+        if (Game.Instance?.Net != null)
+            netPanel.Init(Game.Instance.Net);
+
+        spectateBtn.Pressed += () => { netPanel.Visible = true; UIAnimator.FadeIn(netPanel, 0.2f); };
+
+        var hint = MkLabel("A/D 变道 · S 掉头 · 空格 爆破 · Shift 冲刺", 18, new Color(0.7f, 0.7f, 0.75f), HorizontalAlignment.Center);
+        hint.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter;
+        box.AddChild(hint);
+
+        UIAnimator.StaggerIn(new Control[] { title, startBtn, spectateBtn, hint }, 0.08f, 0.35f);
+        AddChild(_startOverlay);
     }
 
     /// <summary>One score side: progress bar with the caption drawn on top of it.</summary>

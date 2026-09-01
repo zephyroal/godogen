@@ -77,7 +77,7 @@ public partial class NetworkPanel : Control
         if (err == Error.Ok)
         {
             Visible = false;
-            Game.Instance?.ChooseMode(Game.Mode.SpectatorHost);
+            Game.Instance?.ChooseMode(GameMode.SpectatorHost);
         }
     }
 

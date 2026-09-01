@@ -54,6 +54,7 @@ public partial class Runner : Node3D
         StunTimer = Mathf.Max(0f, StunTimer - dt);
 
         if (Game.Instance != null && Game.Instance.GameOver) return; // freeze on the end screen
+        if (Game.Instance?.Hud is { GameStarted: false }) return; // wait for start overlay
 
         if (Dead)
         {
