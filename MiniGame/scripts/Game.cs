@@ -95,6 +95,8 @@ public partial class Game : Node3D
         SpawnRunners();
         Hud = new HUD { Name = "HUD" };
         AddChild(Hud);
+        if (OS.IsDebugBuild())
+            AddChild(new Fps { Name = "Fps" }); // release builds: no node, zero overhead
         PrePositionCamera();
         Hud.Announce("摧毁红方 10 号终极主城即可获胜！", 4f);
 

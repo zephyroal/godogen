@@ -52,6 +52,8 @@ public partial class Game : Node3D
         SpawnPieces();
         Hud = new HUD { Name = "HUD" };
         AddChild(Hud);
+        if (OS.IsDebugBuild())
+            AddChild(new Fps { Name = "Fps" }); // release builds: no node, zero overhead
         UpdateCamera();
 
         // instant rematch: re-enter the previous mode without the selection screen
