@@ -14,6 +14,8 @@ public partial class HUD : CanvasLayer
     public Button BtnVsAI { get; private set; }
     public Button BtnTwo { get; private set; }
     private float _checkT;
+    private Color _hpBarOrigColor;
+    private bool _turnPulseQueued;
 
     // warm lacquer palette matching the wooden board
     private static readonly Color PanelBg = new(0.13f, 0.08f, 0.05f, 0.92f);
@@ -164,8 +166,21 @@ public partial class HUD : CanvasLayer
         hint.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter;
         box.AddChild(hint);
 
-        BtnVsAI.Pressed += () => { _startOverlay.Visible = false; Game.Instance?.ChooseMode(Game.Mode.VsAI); };
-        BtnTwo.Pressed += () => { _startOverlay.Visible = false; Game.Instance?.ChooseMode(Game.Mode.TwoPlayers); };
+        // staggered slide+fade entrance
+        UIAnimator.StaggerIn(new Control[] { title, sub, BtnVsAI, BtnTwo, btnOnline, hint }, 0.08f, 0.35f);
+        BtnVsAI.Pressed += () => { UIAnimator.FadeOut(_startOverlay, 0.2f, true); Game.Instance?.ChooseMode(Game.Mode.VsAI); };
+        BtnTwo.Pressed += () => { UIAnimator.FadeOut(_startOverlay, 0.2f, true); Game.Instance?.ChooseMode(Game.Mode.TwoPlayers); };
+
+        var btnOnline = MkButton("联机对战", 30);
+        btnOnline.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter;
+        box.AddChild(btnOnline);
+
+        var netPanel = new NetworkPanel { Visible = false };
+        _startOverlay.AddChild(netPanel);
+        netPanel.Init(Game.Instance.Net);
+
+        btnOnline.Pressed += () => { netPanel.Visible = true; UIAnimator.FadeIn(netPanel, 0.2f); };
+
         AddChild(_startOverlay);
     }
 
@@ -208,6 +223,11 @@ public partial class HUD : CanvasLayer
 
     public override void _Process(double delta)
     {
+        if (_turnPulseQueued)
+        {
+            _turnPulseQueued = false;
+            UIAnimator.Pulse(_turnBg, 1.05f, 0.2f);
+        }
         if (_checkT > 0f)
         {
             _checkT -= (float)delta;
@@ -228,6 +248,7 @@ public partial class HUD : CanvasLayer
         string text = thinking ? "黑方思考中…" : red ? "红方行棋" : "黑方行棋";
         _turnPill.Text = moveNumber > 0 ? $"第 {moveNumber} 手 · {text}" : text;
         _turnPill.Modulate = red ? new Color(1f, 0.6f, 0.5f) : new Color(0.8f, 0.88f, 1f);
+        _turnPulseQueued = true;
     }
 
     public void FlashCheck()
@@ -235,6 +256,7 @@ public partial class HUD : CanvasLayer
         _checkT = 1.6f;
         _checkFlash.Visible = true;
         _checkFlash.Modulate = new Color(1f, 0.3f, 0.25f, 1f);
+        UIAnimator.Shake(_checkFlash, 10f, 0.35f);
     }
 
     public void ShowEnd(Side winner, bool checkmate)
@@ -243,5 +265,8 @@ public partial class HUD : CanvasLayer
         _endTitle.Modulate = winner == Side.Red ? new Color(1f, 0.5f, 0.4f) : new Color(0.95f, 0.83f, 0.55f);
         _endReason.Text = checkmate ? "绝杀 —— 被将死" : "困毙 —— 无子可动";
         _endOverlay.Visible = true;
+        UIAnimator.FadeIn(_endOverlay, 0.4f);
+        _endTitle.Modulate = new Color(_endTitle.Modulate, 0f);
+        UIAnimator.SlideIn(_endTitle, new Vector2(0, -60), 0.5f);
     }
 }

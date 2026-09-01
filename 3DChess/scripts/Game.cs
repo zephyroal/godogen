@@ -7,7 +7,7 @@ namespace Xiangqi3D;
 /// Taps arrive as (emulated) left mouse clicks — one path for touch and mouse; finger drags orbit/zoom the camera.</summary>
 public partial class Game : Node3D
 {
-    public enum Mode { VsAI, TwoPlayers }
+    public enum Mode { VsAI, TwoPlayers, OnlineHost, OnlineGuest }
 
     public static Game Instance { get; private set; }
 
@@ -20,6 +20,7 @@ public partial class Game : Node3D
     public Board Board { get; private set; }
     public HUD Hud { get; private set; }
     public AudioPlayer Audio { get; private set; }
+    public NetworkManager Net { get; private set; }
     public readonly List<Piece> AllPieces = new();
     private readonly Dictionary<int, Piece> _pieces = new();
     private readonly Dictionary<int, Vector2> _touchPos = new();
@@ -118,6 +119,9 @@ public partial class Game : Node3D
 
         Audio = new AudioPlayer();
         AddChild(Audio);
+
+        Net = new NetworkManager { Name = "Network" };
+        AddChild(Net);
     }
 
     private void SpawnPieces()
@@ -304,6 +308,7 @@ public partial class Game : Node3D
     {
         if (!GameStarted || GameOver || _movingPiece != null) return;
         if (CurrentMode == Mode.VsAI && Position.Turn == Side.Black) return;
+        if (!IsLocalTurn()) return;
 
         if (_selected != null && idx >= 0)
         {
@@ -388,6 +393,10 @@ public partial class Game : Node3D
         }
         mover.AnimateMove(Board.WorldOf(m.To), victim != null);
         _movingPiece = mover;
+
+        // sync to remote peer in online mode
+        if ((CurrentMode == Mode.OnlineHost || CurrentMode == Mode.OnlineGuest) && Multiplayer.HasMultiplayerPeer())
+            Rpc(nameof(RpcMove), m.From, m.To);
     }
 
     private Vector3 TraySlot(Piece victim)
@@ -458,6 +467,33 @@ public partial class Game : Node3D
     }
 
     public void Menu() => GetTree().ReloadCurrentScene();
+
+    // ---- online RPC ----
+
+    /// <summary>Send a move to the remote peer. Called locally after ExecuteMove.</summary>
+    [Rpc(MultiplayerApi.RpcMode.AnyPeer, CallLocal = false, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    public void RpcMove(int from, int to)
+    {
+        if (CurrentMode == Mode.OnlineHost && Position.Turn == Side.Black)
+            ExecuteMove(new Move(from, to));
+        else if (CurrentMode == Mode.OnlineGuest && Position.Turn == Side.Red)
+            ExecuteMove(new Move(from, to));
+    }
+
+    /// <summary>Send a restart request to the remote peer.</summary>
+    [Rpc(MultiplayerApi.RpcMode.AnyPeer, CallLocal = false, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    public void RpcRestart()
+    {
+        Rematch();
+    }
+
+    /// <summary>True if the local player is allowed to move in online mode.</summary>
+    private bool IsLocalTurn()
+    {
+        if (CurrentMode != Mode.OnlineHost && CurrentMode != Mode.OnlineGuest) return true;
+        bool localRed = CurrentMode == Mode.OnlineHost;
+        return (localRed && Position.Turn == Side.Red) || (!localRed && Position.Turn == Side.Black);
+    }
 
     public void Undo()
     {

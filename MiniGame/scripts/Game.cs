@@ -140,9 +140,9 @@ public partial class Game : Node3D
         }
         else
         {
-            // tactical overview: steep ~60° pitch, wide view, player in lower third (per concept art)
+            // elevated chase cam: ~55° pitch, player's back visible, horizon at top (per concept art)
             int heading = Player != null ? Player.Heading : -1;
-            var camTarget = focus + new Vector3(0f, 26f, -heading * 30f);
+            var camTarget = focus + new Vector3(0f, 17f, -heading * 14f);
             _cam.Position = _cam.Position.Lerp(camTarget, Mathf.Min(1f, dt * 5f));
             if (_shake > 0f)
             {
@@ -150,7 +150,7 @@ public partial class Game : Node3D
                 float a = Mathf.Max(0f, _shake / 0.35f) * 0.6f;
                 _cam.Position += new Vector3(Rng.NextSingle() - 0.5f, (Rng.NextSingle() - 0.5f) * 0.5f, Rng.NextSingle() - 0.5f) * a;
             }
-            _cam.LookAt(focus + new Vector3(0f, 0f, heading * 15f), Vector3.Up);
+            _cam.LookAt(focus + new Vector3(0f, 1.5f, heading * 10f), Vector3.Up);
             _sun.Position = focus + new Vector3(0f, 40f, 0f);
         }
 
@@ -223,7 +223,7 @@ public partial class Game : Node3D
         {
             Name = "Camera",
             Projection = Camera3D.ProjectionType.Perspective,
-            Fov = 42f,
+            Fov = 50f,
             Near = 0.5f,
             Far = 600f,
         };
@@ -619,8 +619,8 @@ public partial class Game : Node3D
     private void PrePositionCamera()
     {
         if (Player == null) return;
-        _cam.Position = Player.Position + new Vector3(0f, 26f, -Player.Heading * 30f);
-        _cam.LookAt(Player.Position + new Vector3(0f, 0f, Player.Heading * 15f), Vector3.Up);
+        _cam.Position = Player.Position + new Vector3(0f, 17f, -Player.Heading * 14f);
+        _cam.LookAt(Player.Position + new Vector3(0f, 1.5f, Player.Heading * 10f), Vector3.Up);
     }
 
     // ---- queries used by runners ----

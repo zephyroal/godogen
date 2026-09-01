@@ -22,6 +22,8 @@ public partial class HUD : CanvasLayer
     private Label _endTitle;
     private Label _endList;
     private float _announceT, _helpT;
+    private float _prevBlastCd, _prevDashCd;
+    private float _prevHp;
 
     private static StyleBoxFlat SqStyle(Color fill, Color border)
     {
@@ -103,7 +105,8 @@ public partial class HUD : CanvasLayer
         };
         Anchor(_hpBar, Control.LayoutPreset.BottomLeft, 24f, -80f, 324f, -56f);
         _hpBar.AddThemeStyleboxOverride("background", SqStyle(new Color(0.1f, 0.1f, 0.12f), new Color(0f, 0f, 0f)));
-        _hpBar.AddThemeStyleboxOverride("fill", SqStyle(Game.Blue, new Color(0f, 0f, 0f)));
+        var fillStyle = SqStyle(Game.Blue, new Color(0f, 0f, 0f));
+        _hpBar.AddThemeStyleboxOverride("fill", fillStyle);
         AddChild(_hpBar);
         _hpText = MkLabel("生命 120", 20, new Color(1f, 1f, 1f));
         Anchor(_hpText, Control.LayoutPreset.BottomLeft, 28f, -106f, 240f, -82f);
@@ -225,11 +228,34 @@ public partial class HUD : CanvasLayer
         var p = Game.Instance?.Player;
         if (p != null && IsInstanceValid(p))
         {
+            float hp = Mathf.Max(0f, p.Hp);
             _hpBar.MaxValue = p.MaxHp;
-            _hpBar.Value = Mathf.Max(0f, p.Hp);
-            _hpText.Text = $"生命 {Mathf.CeilToInt(Mathf.Max(0f, p.Hp))}";
-            _blastCd.Value = 100f * (1f - p.BlastCdTimer / Game.BlastCd);
-            _dashCd.Value = 100f * (1f - p.DashCdTimer / Game.DashCd);
+            _hpBar.Value = hp;
+            _hpText.Text = $"生命 {Mathf.CeilToInt(hp)}";
+
+            // HP bar flash red on damage
+            if (hp < _prevHp - 1f && _hpBar.HasThemeStyleboxOverride("fill"))
+            {
+                var origStyle = _hpBar.GetThemeStylebox("fill") as StyleBoxFlat;
+                var flashStyle = SqStyle(new Color(1f, 0.3f, 0.2f), new Color(0f, 0f, 0f));
+                _hpBar.AddThemeStyleboxOverride("fill", flashStyle);
+                GetTree().CreateTimer(0.2f).Timeout += () => _hpBar.AddThemeStyleboxOverride("fill", SqStyle(Game.Blue, new Color(0f, 0f, 0f)));
+            }
+            _prevHp = hp;
+
+            float blastCd = 100f * (1f - p.BlastCdTimer / Game.BlastCd);
+            float dashCd = 100f * (1f - p.DashCdTimer / Game.DashCd);
+            _blastCd.Value = blastCd;
+            _dashCd.Value = dashCd;
+
+            // pulse skill bar when it becomes ready
+            if (blastCd >= 99f && _prevBlastCd < 99f)
+                UIAnimator.Pulse(_blastCd, 1.15f, 0.2f);
+            if (dashCd >= 99f && _prevDashCd < 99f)
+                UIAnimator.Pulse(_dashCd, 1.15f, 0.2f);
+            _prevBlastCd = blastCd;
+            _prevDashCd = dashCd;
+
             _respawn.Text = p.Dead ? $"复活中 {p.RespawnTimer:0.0}s" : "";
         }
     }
@@ -239,6 +265,7 @@ public partial class HUD : CanvasLayer
         _announce.Text = text;
         _announceT = duration;
         _announce.Modulate = new Color(1f, 0.95f, 0.75f, 1f);
+        UIAnimator.SlideIn(_announce, new Vector2(0, -40), 0.3f);
     }
 
     public void UpdateFortressSquares()
@@ -266,5 +293,8 @@ public partial class HUD : CanvasLayer
             ? "我方城池无一失守"
             : "被摧毁的城池：\n" + string.Join("  ", destroyedFortresses);
         _endScreen.Visible = true;
+        _endScreen.Modulate = new Color(1f, 1f, 1f, 0f);
+        UIAnimator.FadeIn(_endScreen, 0.4f);
+        UIAnimator.Pulse(_endTitle, 1.12f, 0.4f);
     }
 }
