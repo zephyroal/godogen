@@ -24,6 +24,7 @@ public partial class Runner : Node3D
     private float _aiTimer, _stuckTimer, _runPhase;
     private Node3D _legL, _legR, _armL, _armR, _body;
     private Label3D _tag;
+    private bool _useGlbChar;
     public static int BlastCount;
 
     private StandardMaterial3D _bodyMat, _limbMat;
@@ -428,41 +429,53 @@ public partial class Runner : Node3D
     private void BuildBody()
     {
         var c = Game.ColorOf(Team);
-        _bodyMat = new StandardMaterial3D { AlbedoColor = c, Roughness = 0.85f };
-        _limbMat = new StandardMaterial3D { AlbedoColor = c.Darkened(0.35f), Roughness = 0.9f };
-        var headMat = new StandardMaterial3D { AlbedoColor = c.Lightened(0.35f), Roughness = 0.85f };
-
-        Node3D Part(StandardMaterial3D mat, Vector3 size, Vector3 pos)
-        {
-            var m = new MeshInstance3D
-            {
-                Mesh = new BoxMesh { Size = size },
-                MaterialOverride = mat,
-                Position = pos,
-            };
-            return m;
-        }
 
         _body = new Node3D();
         AddChild(_body);
-        _body.AddChild(Part(_bodyMat, new Vector3(1.05f, 0.9f, 0.6f), new Vector3(0f, 1.42f, 0f)));
 
-        var head = Part(headMat, new Vector3(0.72f, 0.72f, 0.72f), new Vector3(0f, 2.25f, 0f));
-        _body.AddChild(head);
+        // try GLB character model (static mesh, no skeleton — procedural bob/tilt animates it)
+        var charGlb = Glb.Create("res://assets/glb/character.glb", 2.4f);
+        if (charGlb != null)
+        {
+            _useGlbChar = true;
+            // tint the character mesh with team color
+            TintRecursive(charGlb, c);
+            _body.AddChild(charGlb);
+        }
+        else
+        {
+            _useGlbChar = false;
+            _bodyMat = new StandardMaterial3D { AlbedoColor = c, Roughness = 0.85f };
+            _limbMat = new StandardMaterial3D { AlbedoColor = c.Darkened(0.35f), Roughness = 0.9f };
+            var headMat = new StandardMaterial3D { AlbedoColor = c.Lightened(0.35f), Roughness = 0.85f };
 
-        _legL = new Node3D { Position = new Vector3(-0.28f, 0.95f, 0f) };
-        _legL.AddChild(Part(_limbMat, new Vector3(0.42f, 0.95f, 0.42f), new Vector3(0f, -0.475f, 0f)));
-        _body.AddChild(_legL);
-        _legR = new Node3D { Position = new Vector3(0.28f, 0.95f, 0f) };
-        _legR.AddChild(Part(_limbMat, new Vector3(0.42f, 0.95f, 0.42f), new Vector3(0f, -0.475f, 0f)));
-        _body.AddChild(_legR);
+            Node3D Part(StandardMaterial3D mat, Vector3 size, Vector3 pos)
+            {
+                return new MeshInstance3D
+                {
+                    Mesh = new BoxMesh { Size = size },
+                    MaterialOverride = mat,
+                    Position = pos,
+                };
+            }
 
-        _armL = new Node3D { Position = new Vector3(-0.72f, 1.8f, 0f) };
-        _armL.AddChild(Part(_bodyMat, new Vector3(0.32f, 0.85f, 0.32f), new Vector3(0f, -0.425f, 0f)));
-        _body.AddChild(_armL);
-        _armR = new Node3D { Position = new Vector3(0.72f, 1.8f, 0f) };
-        _armR.AddChild(Part(_bodyMat, new Vector3(0.32f, 0.85f, 0.32f), new Vector3(0f, -0.425f, 0f)));
-        _body.AddChild(_armR);
+            _body.AddChild(Part(_bodyMat, new Vector3(1.05f, 0.9f, 0.6f), new Vector3(0f, 1.42f, 0f)));
+            _body.AddChild(Part(headMat, new Vector3(0.72f, 0.72f, 0.72f), new Vector3(0f, 2.25f, 0f)));
+
+            _legL = new Node3D { Position = new Vector3(-0.28f, 0.95f, 0f) };
+            _legL.AddChild(Part(_limbMat, new Vector3(0.42f, 0.95f, 0.42f), new Vector3(0f, -0.475f, 0f)));
+            _body.AddChild(_legL);
+            _legR = new Node3D { Position = new Vector3(0.28f, 0.95f, 0f) };
+            _legR.AddChild(Part(_limbMat, new Vector3(0.42f, 0.95f, 0.42f), new Vector3(0f, -0.475f, 0f)));
+            _body.AddChild(_legR);
+
+            _armL = new Node3D { Position = new Vector3(-0.72f, 1.8f, 0f) };
+            _armL.AddChild(Part(_bodyMat, new Vector3(0.32f, 0.85f, 0.32f), new Vector3(0f, -0.425f, 0f)));
+            _body.AddChild(_armL);
+            _armR = new Node3D { Position = new Vector3(0.72f, 1.8f, 0f) };
+            _armR.AddChild(Part(_bodyMat, new Vector3(0.32f, 0.85f, 0.32f), new Vector3(0f, -0.425f, 0f)));
+            _body.AddChild(_armR);
+        }
 
         if (IsPlayer)
         {
@@ -495,6 +508,19 @@ public partial class Runner : Node3D
         AddChild(_tag);
     }
 
+    /// <summary>Recursively tint all MeshInstance3D children with a team-color override.</summary>
+    private static void TintRecursive(Node node, Color c)
+    {
+        if (node is MeshInstance3D mi && mi.MaterialOverride == null)
+            mi.MaterialOverride = new StandardMaterial3D
+            {
+                AlbedoColor = new Color(c.R * 0.7f + 0.3f, c.G * 0.7f + 0.3f, c.B * 0.7f + 0.3f),
+                Roughness = 0.7f,
+            };
+        foreach (var child in node.GetChildren())
+            if (child is Node n) TintRecursive(n, c);
+    }
+
     private void Animate(float dt)
     {
         // face the running direction (lerp yaw)
@@ -504,15 +530,32 @@ public partial class Runner : Node3D
 
         bool moving = Speed > 0.1f;
         if (moving) _runPhase += dt * Speed * 1.1f;
-        float swing = moving ? Mathf.Sin(_runPhase) * 0.85f : 0f;
-        _legL.Rotation = new Vector3(swing, 0f, 0f);
-        _legR.Rotation = new Vector3(-swing, 0f, 0f);
-        _armL.Rotation = new Vector3(-swing * 0.7f, 0f, 0f);
-        _armR.Rotation = new Vector3(swing * 0.7f, 0f, 0f);
-        _body.Position = new Vector3(0f, moving ? Mathf.Abs(Mathf.Sin(_runPhase)) * 0.08f : 0f, 0f);
-        _body.Scale = _body.Scale.Lerp(Vector3.One, Mathf.Min(1f, dt * 10f));
-        if (Dashing) _body.Rotation = new Vector3(-0.28f * Heading, 0f, 0f);
-        else _body.Rotation = new Vector3(Mathf.Lerp(_body.Rotation.X, 0f, dt * 10f), 0f, 0f);
+
+        if (_useGlbChar)
+        {
+            // GLB character: bob + lean (no limb bones to swing)
+            float bob = moving ? Mathf.Abs(Mathf.Sin(_runPhase)) * 0.12f : 0f;
+            float lean = moving ? 0.08f : 0f;
+            _body.Position = new Vector3(0f, bob, 0f);
+            _body.Scale = _body.Scale.Lerp(Vector3.One, Mathf.Min(1f, dt * 10f));
+            if (Dashing)
+                _body.Rotation = new Vector3(-0.28f * Heading, 0f, 0f);
+            else
+                _body.Rotation = new Vector3(Mathf.Lerp(_body.Rotation.X, -lean * Heading, dt * 10f), 0f, 0f);
+        }
+        else
+        {
+            // procedural blocky body: swing limbs
+            float swing = moving ? Mathf.Sin(_runPhase) * 0.85f : 0f;
+            if (_legL != null) _legL.Rotation = new Vector3(swing, 0f, 0f);
+            if (_legR != null) _legR.Rotation = new Vector3(-swing, 0f, 0f);
+            if (_armL != null) _armL.Rotation = new Vector3(-swing * 0.7f, 0f, 0f);
+            if (_armR != null) _armR.Rotation = new Vector3(swing * 0.7f, 0f, 0f);
+            _body.Position = new Vector3(0f, moving ? Mathf.Abs(Mathf.Sin(_runPhase)) * 0.08f : 0f, 0f);
+            _body.Scale = _body.Scale.Lerp(Vector3.One, Mathf.Min(1f, dt * 10f));
+            if (Dashing) _body.Rotation = new Vector3(-0.28f * Heading, 0f, 0f);
+            else _body.Rotation = new Vector3(Mathf.Lerp(_body.Rotation.X, 0f, dt * 10f), 0f, 0f);
+        }
 
         if (_tag != null)
             _tag.Visible = true;

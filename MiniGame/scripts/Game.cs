@@ -499,7 +499,7 @@ public partial class Game : Node3D
     private void BuildFortresses()
     {
         float z = 4f;
-        for (int idx = 1; idx <= FortressCount; idx++)
+        for (int idx = FortressCount; idx >= 1; idx--) // #10 far north, #1 near spawn
         {
             float depth = 9f + 1.2f * idx;
             // Blue and red fortresses face each other across the road at the same Z
