@@ -200,10 +200,12 @@ public partial class Game : Node3D
             BackgroundMode = Environment.BGMode.Sky,
             Sky = new Sky { SkyMaterial = sky },
             AmbientLightSource = Environment.AmbientSource.Sky,
-            AmbientLightEnergy = 0.6f,
+            AmbientLightEnergy = 0.5f,
+            AmbientLightColor = new Color(0.6f, 0.7f, 0.9f),
             FogEnabled = false,
             SsaoEnabled = true,
             SsaoIntensity = 1.5f,
+            SsaoRadius = 1.5f,
             SdfgiEnabled = false,
             GlowEnabled = true,
             GlowIntensity = 0.8f,
@@ -211,16 +213,6 @@ public partial class Game : Node3D
             TonemapMode = Environment.ToneMapper.Filmic,
         };
         AddChild(new WorldEnvironment { Environment = env });
-
-        // reflection probe for specular highlights on buildings/ground
-        var probe = new ReflectionProbe
-        {
-            Size = new Vector3(50f, 30f, 100f),
-            UpdateMode = ReflectionProbe.UpdateModeEnum.Once,
-            AmbientMode = ReflectionProbe.AmbientModeEnum.Environment,
-            Intensity = 0.6f,
-        };
-        AddChild(probe);
 
         // warm key light with soft shadows
         _sun = new DirectionalLight3D
@@ -311,7 +303,13 @@ public partial class Game : Node3D
     private void BuildGround()
     {
         var mesh = new BoxMesh { Size = new Vector3(BlockSize, 1f, BlockSize) };
-        mesh.Material = new StandardMaterial3D { VertexColorUseAsAlbedo = true, Roughness = 0.5f, Metallic = 0.1f };
+        mesh.Material = new StandardMaterial3D
+        {
+            VertexColorUseAsAlbedo = true,
+            Roughness = 0.35f,
+            Metallic = 0.2f,
+            RoughnessTextureChannel = StandardMaterial3D.TextureChannel.Red,
+        };
 
         int nx = 14, nz = 144; // x in [-19.5, 19.5], z in [-214.5, 214.5]
         var mm = new MultiMesh
@@ -347,7 +345,7 @@ public partial class Game : Node3D
         AddChild(new MultiMeshInstance3D { Multimesh = mm, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
 
         // road markings: dashed center line + solid edge lines
-        var whiteMat = new StandardMaterial3D { AlbedoColor = new Color(0.92f, 0.92f, 0.88f), Roughness = 0.3f, Metallic = 0.15f };
+        var whiteMat = new StandardMaterial3D { AlbedoColor = new Color(0.95f, 0.95f, 0.90f), Roughness = 0.2f, Metallic = 0.3f };
         var dashMesh = new BoxMesh { Size = new Vector3(0.35f, 0.06f, 1.6f), Material = whiteMat };
         int dashes = 124;
         var dashMM = new MultiMesh

@@ -256,7 +256,7 @@ public partial class Fortress : Node3D
         {
             var c = Game.ColorOf(Team);
             float f = 1f - shade * 0.13f;
-            mat = new StandardMaterial3D { AlbedoColor = new Color(c.R * f, c.G * f, c.B * f), Roughness = 0.5f, Metallic = 0.1f };
+            mat = new StandardMaterial3D { AlbedoColor = new Color(c.R * f, c.G * f, c.B * f), Roughness = 0.3f, Metallic = 0.25f };
             MatCache[key] = mat;
         }
         return mat;
@@ -289,7 +289,7 @@ public partial class Fortress : Node3D
             ? Game.LaneX[baseLane + 2] + 2f   // just outside the inner blue lane, toward road
             : Game.LaneX[baseLane] - 2f;       // just outside the inner red lane, toward road
 
-        var frameMat = new StandardMaterial3D { AlbedoColor = c.Darkened(0.25f), Roughness = 0.9f };
+        var frameMat = new StandardMaterial3D { AlbedoColor = c.Darkened(0.25f), Roughness = 0.4f, Metallic = 0.3f };
         var post = new BoxMesh { Size = new Vector3(0.8f, height, 0.8f), Material = frameMat };
         foreach (float off in new[] { -2.4f, 2.4f })
             AddChild(new MeshInstance3D { Mesh = post, Position = new Vector3(roadX, height * 0.5f, gateZ + off) });
@@ -372,7 +372,7 @@ public partial class Fortress : Node3D
     private void AddBattlement(float px, float pz)
     {
         var c = Game.ColorOf(Team);
-        var capMat = new StandardMaterial3D { AlbedoColor = c.Lightened(0.08f), Roughness = 0.9f };
+        var capMat = new StandardMaterial3D { AlbedoColor = c.Lightened(0.08f), Roughness = 0.3f, Metallic = 0.4f };
         var cap = new MeshInstance3D
         {
             Mesh = new BoxMesh { Size = new Vector3(2f, 0.35f, 2f), Material = capMat },
