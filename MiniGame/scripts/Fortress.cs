@@ -256,7 +256,7 @@ public partial class Fortress : Node3D
         {
             var c = Game.ColorOf(Team);
             float f = 1f - shade * 0.13f;
-            mat = new StandardMaterial3D { AlbedoColor = new Color(c.R * f, c.G * f, c.B * f), Roughness = 0.9f };
+            mat = new StandardMaterial3D { AlbedoColor = new Color(c.R * f, c.G * f, c.B * f), Roughness = 0.5f, Metallic = 0.1f };
             MatCache[key] = mat;
         }
         return mat;
@@ -272,7 +272,8 @@ public partial class Fortress : Node3D
             EmissionEnabled = true,
             Emission = c,
             EmissionEnergyMultiplier = 1.6f,
-            Roughness = 0.4f,
+            Roughness = 0.3f,
+            Metallic = 0.2f,
         };
     }
 

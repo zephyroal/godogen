@@ -175,41 +175,46 @@ public partial class Game : Node3D
     {
         var sky = new ProceduralSkyMaterial
         {
-            SkyTopColor = new Color(0.12f, 0.38f, 0.90f),
-            SkyHorizonColor = new Color(0.58f, 0.72f, 0.92f),
-            GroundBottomColor = new Color(0.35f, 0.42f, 0.30f),
+            SkyTopColor = new Color(0.25f, 0.55f, 0.95f),
+            SkyHorizonColor = new Color(0.55f, 0.75f, 0.95f),
+            GroundBottomColor = new Color(0.45f, 0.55f, 0.35f),
+            SunCurve = 0.15f,
         };
         var env = new Environment
         {
             BackgroundMode = Environment.BGMode.Sky,
             Sky = new Sky { SkyMaterial = sky },
             AmbientLightSource = Environment.AmbientSource.Sky,
-            AmbientLightEnergy = 0.25f,
-            FogEnabled = true,
-            FogLightColor = new Color(0.75f, 0.80f, 0.90f),
-            FogDensity = 0.001f,
-            FogSkyAffect = 0.1f,
+            AmbientLightEnergy = 0.6f,
+            FogEnabled = false,
             SsaoEnabled = true,
-            SsaoIntensity = 3.0f,
-            SdfgiEnabled = true,
-            SdfgiUseOcclusion = true,
-            SdfgiReadSkyLight = true,
-            SdfgiBounceFeedback = 0.3f,
+            SsaoIntensity = 1.5f,
+            SdfgiEnabled = false,
             GlowEnabled = true,
-            GlowIntensity = 0.85f,
+            GlowIntensity = 0.8f,
             GlowBloom = 0.08f,
             TonemapMode = Environment.ToneMapper.Filmic,
         };
         AddChild(new WorldEnvironment { Environment = env });
+
+        // reflection probe for specular highlights on buildings/ground
+        var probe = new ReflectionProbe
+        {
+            Size = new Vector3(50f, 30f, 100f),
+            UpdateMode = ReflectionProbe.UpdateModeEnum.Once,
+            AmbientMode = ReflectionProbe.AmbientModeEnum.Environment,
+            Intensity = 0.6f,
+        };
+        AddChild(probe);
 
         // warm key light with soft shadows
         _sun = new DirectionalLight3D
         {
             Name = "Sun",
             ShadowEnabled = true,
-            LightEnergy = 1.25f,
+            LightEnergy = 1.6f,
             LightColor = new Color(1f, 0.96f, 0.88f),
-            DirectionalShadowMaxDistance = 70f,
+            DirectionalShadowMaxDistance = 80f,
         };
         _sun.RotationDegrees = new Vector3(-52f, -32f, 0f);
         AddChild(_sun);
@@ -219,7 +224,7 @@ public partial class Game : Node3D
         {
             Name = "Fill",
             ShadowEnabled = false,
-            LightEnergy = 0.25f,
+            LightEnergy = 0.4f,
             LightColor = new Color(0.7f, 0.8f, 1.0f),
         };
         fill.RotationDegrees = new Vector3(-38f, 140f, 0f);
@@ -291,7 +296,7 @@ public partial class Game : Node3D
     private void BuildGround()
     {
         var mesh = new BoxMesh { Size = new Vector3(BlockSize, 1f, BlockSize) };
-        mesh.Material = new StandardMaterial3D { VertexColorUseAsAlbedo = true, Roughness = 1f };
+        mesh.Material = new StandardMaterial3D { VertexColorUseAsAlbedo = true, Roughness = 0.5f, Metallic = 0.1f };
 
         int nx = 14, nz = 144; // x in [-19.5, 19.5], z in [-214.5, 214.5]
         var mm = new MultiMesh
@@ -301,11 +306,11 @@ public partial class Game : Node3D
             UseColors = true,
             InstanceCount = nx * nz,
         };
-        var grass1 = new Color(0.37f, 0.56f, 0.31f);
-        var grass2 = new Color(0.32f, 0.51f, 0.28f);
-        var dirt = new Color(0.48f, 0.38f, 0.26f);
-        var road1 = new Color(0.33f, 0.34f, 0.37f);
-        var road2 = new Color(0.30f, 0.31f, 0.34f);
+        var grass1 = new Color(0.45f, 0.68f, 0.32f);
+        var grass2 = new Color(0.38f, 0.60f, 0.28f);
+        var dirt = new Color(0.60f, 0.48f, 0.30f);
+        var road1 = new Color(0.38f, 0.39f, 0.42f);
+        var road2 = new Color(0.34f, 0.35f, 0.38f);
         var stone = new Color(0.52f, 0.54f, 0.58f);
         int i = 0;
         for (int ix = 0; ix < nx; ix++)
@@ -327,7 +332,7 @@ public partial class Game : Node3D
         AddChild(new MultiMeshInstance3D { Multimesh = mm, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
 
         // road markings: dashed center line + solid edge lines
-        var whiteMat = new StandardMaterial3D { AlbedoColor = new Color(0.92f, 0.92f, 0.88f), Roughness = 0.8f };
+        var whiteMat = new StandardMaterial3D { AlbedoColor = new Color(0.92f, 0.92f, 0.88f), Roughness = 0.3f, Metallic = 0.15f };
         var dashMesh = new BoxMesh { Size = new Vector3(0.35f, 0.06f, 1.6f), Material = whiteMat };
         int dashes = 124;
         var dashMM = new MultiMesh

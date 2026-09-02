@@ -26,7 +26,11 @@ public partial class HUD : CanvasLayer
     private float _prevHp;
     private Control _startOverlay;
     public bool GameStarted { get; private set; }
-    public void SetStart() => GameStarted = true;
+    public void SetStart()
+    {
+        GameStarted = true;
+        if (_startOverlay != null) _startOverlay.Visible = false;
+    }
 
     private static StyleBoxFlat SqStyle(Color fill, Color border)
     {
@@ -97,7 +101,6 @@ public partial class HUD : CanvasLayer
         _help = MkLabel("A/D 变道 · S 掉头防守 · 空格 爆破 · Shift 冲刺撞击", 22, new Color(1f, 1f, 1f, 0.85f), HorizontalAlignment.Center);
         Anchor(_help, Control.LayoutPreset.BottomWide, 0f, -48f, 0f, -14f);
         AddChild(_help);
-        _helpT = 12f;
 
         // HP bar bottom-left
         _hpBar = new ProgressBar
@@ -138,30 +141,37 @@ public partial class HUD : CanvasLayer
         _startOverlay = new Control();
         _startOverlay.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         _startOverlay.MouseFilter = Control.MouseFilterEnum.Stop;
+        AddChild(_startOverlay);
+
         var dim = new ColorRect { Color = new Color(0f, 0f, 0f, 0.72f) };
         dim.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         _startOverlay.AddChild(dim);
 
-        // Title (center-top)
-        var title = Shadowed(MkLabel("堡垒冲刺", 56, new Color(1f, 0.88f, 0.4f), HorizontalAlignment.Center), new Color(0f, 0f, 0f, 0.8f));
-        Anchor(title, Control.LayoutPreset.CenterTop, -300f, 120f, 300f, 200f);
+        // Title
+        var title = Shadowed(MkLabel("堡垒冲刺", 54, new Color(1f, 0.88f, 0.4f), HorizontalAlignment.Center), new Color(0f, 0f, 0f, 0.8f));
+        title.OffsetLeft = 340f; title.OffsetTop = 120f;
+        title.OffsetRight = 940f; title.OffsetBottom = 200f;
         _startOverlay.AddChild(title);
 
-        // Two buttons: absolute-positioned
-        float btnW = 280f, btnH = 72f, gap = 18f;
-        float startY = 260f;
+        // Two buttons
+        float btnW = 280f, btnH = 68f, gap = 14f;
+        float btnX = (1280 - btnW) / 2f;
+        float y0 = 260f;
 
         var startBtn = new Button { Text = "开始游戏", CustomMinimumSize = new Vector2(btnW, btnH) };
         startBtn.AddThemeFontOverride("font", FX.UiFont());
-        startBtn.AddThemeFontSizeOverride("font_size", 26);
-        Anchor(startBtn, Control.LayoutPreset.CenterTop, -btnW / 2f, startY, btnW / 2f, startY + btnH);
+        startBtn.AddThemeFontSizeOverride("font_size", 24);
+        startBtn.OffsetLeft = btnX; startBtn.OffsetTop = y0;
+        startBtn.OffsetRight = btnX + btnW; startBtn.OffsetBottom = y0 + btnH;
         startBtn.Pressed += () => { GameStarted = true; UIAnimator.FadeOut(_startOverlay, 0.2f, true); Game.Instance?.Hud?.Announce("摧毁红方 10 号终极主城即可获胜！", 4f); };
         _startOverlay.AddChild(startBtn);
 
+        float y1 = y0 + btnH + gap;
         var spectateBtn = new Button { Text = "联机观战", CustomMinimumSize = new Vector2(btnW, btnH) };
         spectateBtn.AddThemeFontOverride("font", FX.UiFont());
-        spectateBtn.AddThemeFontSizeOverride("font_size", 26);
-        Anchor(spectateBtn, Control.LayoutPreset.CenterTop, -btnW / 2f, startY + btnH + gap, btnW / 2f, startY + 2 * btnH + gap);
+        spectateBtn.AddThemeFontSizeOverride("font_size", 24);
+        spectateBtn.OffsetLeft = btnX; spectateBtn.OffsetTop = y1;
+        spectateBtn.OffsetRight = btnX + btnW; spectateBtn.OffsetBottom = y1 + btnH;
         _startOverlay.AddChild(spectateBtn);
 
         var netPanel = new NetworkPanel { Visible = false };
@@ -173,11 +183,9 @@ public partial class HUD : CanvasLayer
 
         // Hint (bottom center)
         var hint = MkLabel("A/D 变道 · S 掉头 · 空格 爆破 · Shift 冲刺", 18, new Color(0.7f, 0.7f, 0.75f), HorizontalAlignment.Center);
-        Anchor(hint, Control.LayoutPreset.CenterBottom, -300f, -50f, 300f, -20f);
+        hint.OffsetLeft = 340f; hint.OffsetTop = 640f;
+        hint.OffsetRight = 940f; hint.OffsetBottom = 680f;
         _startOverlay.AddChild(hint);
-
-        UIAnimator.StaggerIn(new Control[] { title, startBtn, spectateBtn, hint }, 0.08f, 0.35f);
-        AddChild(_startOverlay);
     }
 
     /// <summary>One score side: progress bar with the caption drawn on top of it.</summary>
@@ -269,12 +277,7 @@ public partial class HUD : CanvasLayer
             _announce.Modulate = new Color(1f, 0.95f, 0.75f, a);
             if (_announceT <= 0f) _announce.Text = "";
         }
-        if (_helpT > 0f)
-        {
-            _helpT -= dt;
-            _help.Modulate = new Color(1f, 1f, 1f, Mathf.Min(1f, _helpT));
-            if (_helpT <= 0f) _help.Visible = false;
-        }
+        // help strip stays visible (no auto-hide)
 
         var p = Game.Instance?.Player;
         if (p != null && IsInstanceValid(p))

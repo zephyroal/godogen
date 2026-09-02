@@ -463,9 +463,9 @@ public partial class Runner : Node3D
         else
         {
             _useGlbChar = false;
-            _bodyMat = new StandardMaterial3D { AlbedoColor = c, Roughness = 0.85f };
-            _limbMat = new StandardMaterial3D { AlbedoColor = c.Darkened(0.35f), Roughness = 0.9f };
-            var headMat = new StandardMaterial3D { AlbedoColor = c.Lightened(0.35f), Roughness = 0.85f };
+            _bodyMat = new StandardMaterial3D { AlbedoColor = c, Roughness = 0.4f, Metallic = 0.1f };
+            _limbMat = new StandardMaterial3D { AlbedoColor = c.Darkened(0.35f), Roughness = 0.5f, Metallic = 0.1f };
+            var headMat = new StandardMaterial3D { AlbedoColor = c.Lightened(0.35f), Roughness = 0.3f, Metallic = 0.1f };
 
             Node3D Part(StandardMaterial3D mat, Vector3 size, Vector3 pos)
             {
@@ -538,15 +538,29 @@ public partial class Runner : Node3D
 
         if (_useGlbChar)
         {
-            // GLB character: bob + lean (no limb bones to swing)
-            float bob = moving ? Mathf.Abs(Mathf.Sin(_runPhase)) * 0.12f : 0f;
-            float lean = moving ? 0.08f : 0f;
-            _body.Position = new Vector3(0f, bob, 0f);
+            // GLB character: rich procedural animation — bob, lean, arm swing, head bob
+            float phase = moving ? _runPhase : 0f;
+            float bob = moving ? Mathf.Abs(Mathf.Sin(phase)) * 0.18f : 0f;
+            float lean = moving ? 0.12f : 0f;
+            float sway = moving ? Mathf.Sin(phase * 0.5f) * 0.04f : 0f;
+
+            _body.Position = new Vector3(sway, bob, 0f);
             _body.Scale = _body.Scale.Lerp(Vector3.One, Mathf.Min(1f, dt * 10f));
+
             if (Dashing)
-                _body.Rotation = new Vector3(-0.28f * Heading, 0f, 0f);
+            {
+                _body.Rotation = new Vector3(-0.35f * Heading, 0f, 0f);
+                _body.Position = new Vector3(0f, bob * 0.5f, 0f); // lower dash stance
+            }
             else
-                _body.Rotation = new Vector3(Mathf.Lerp(_body.Rotation.X, -lean * Heading, dt * 10f), 0f, 0f);
+            {
+                float targetPitch = -lean * Heading;
+                float targetRoll = sway * 2f;
+                _body.Rotation = new Vector3(
+                    Mathf.Lerp(_body.Rotation.X, targetPitch, dt * 10f),
+                    0f,
+                    Mathf.Lerp(_body.Rotation.Z, targetRoll, dt * 10f));
+            }
         }
         else
         {
