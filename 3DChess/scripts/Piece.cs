@@ -101,7 +101,7 @@ public partial class Piece : Node3D
         float targetH = TargetHeight(Type) * 1.1f; // world units
         float targetD = 0.84f; // base diameter fits grid spacing
 
-        var aabb = GetAabb(instance);
+        var aabb = MeasureAabb(instance);
         float h = aabb.Size.Y;
         float d = Mathf.Max(aabb.Size.X, aabb.Size.Z);
         float scale = Mathf.Min(targetH / h, targetD / d) * 0.95f;
@@ -110,31 +110,43 @@ public partial class Piece : Node3D
         instance.Scale = Vector3.One * scale;
 
         // re-measure after scale and align: bottom at y=0, center on XZ
-        aabb = GetAabb(instance);
-        instance.Position = new Vector3(-aabb.Position.X - aabb.Size.X * 0.5f, -aabb.Position.Y, -aabb.Position.Z - aabb.Size.Z * 0.5f);
+        aabb = MeasureAabb(instance);
+        instance.Position = new Vector3(-aabb.GetCenter().X, -aabb.Position.Y, -aabb.GetCenter().Z);
 
         // orient: red faces north (toward black), black faces south (toward red)
         if (Side == Side.Red)
             instance.RotateY(Mathf.Pi);
     }
 
-    private static Aabb GetAabb(Node3D root)
+    /// <summary>Combined AABB of all meshes under root, in root's local space (transforms all 8 corners).</summary>
+    private static Aabb MeasureAabb(Node3D root)
     {
-        Aabb aabb = new Aabb();
-        bool first = true;
-        void Walk(Node n)
-        {
-            if (n is MeshInstance3D mi)
-            {
-                var a = mi.GetAabb();
-                a.Position = mi.GlobalTransform * a.Position;
-                if (first) { aabb = a; first = false; }
-                else aabb = aabb.Merge(a);
-            }
-            foreach (var c in n.GetChildren()) Walk(c);
-        }
-        Walk(root);
+        var aabb = new Aabb();
+        bool any = false;
+        MeasureInto(root, Transform3D.Identity, ref aabb, ref any);
         return aabb;
+    }
+
+    private static void MeasureInto(Node3D node, Transform3D xform, ref Aabb acc, ref bool any)
+    {
+        Transform3D t = xform * node.Transform;
+        if (node is MeshInstance3D mi && mi.Mesh != null)
+        {
+            Aabb local = mi.Mesh.GetAabb();
+            for (int i = 0; i < 8; i++)
+            {
+                var c = new Vector3(
+                    (i & 1) == 0 ? local.Position.X : local.End.X,
+                    (i & 2) == 0 ? local.Position.Y : local.End.Y,
+                    (i & 4) == 0 ? local.Position.Z : local.End.Z);
+                var w = t * c;
+                acc = any ? acc.Expand(w) : new Aabb(w, Vector3.Zero);
+                any = true;
+            }
+        }
+        foreach (var child in node.GetChildren())
+            if (child is Node3D n)
+                MeasureInto(n, t, ref acc, ref any);
     }
 
     private void BuildProcedural()

@@ -105,6 +105,21 @@ public partial class Game : Node3D
 
         Net = new NetworkManager { Name = "Network" };
         AddChild(Net);
+        Net.OnDisconnected += () =>
+        {
+            if (CurrentMode == GameMode.SpectatorGuest && !GameOver)
+            {
+                CallDeferred(nameof(HandleHostLeft));
+            }
+        };
+        Net.OnPeerDisconnected += (_) =>
+        {
+            if (CurrentMode == GameMode.SpectatorHost && !GameOver)
+            {
+                // spectator left — host continues playing, just log
+                GD.Print("[Net] 观战者已断开，继续游戏");
+            }
+        };
         if (OS.IsDebugBuild())
             AddChild(new Fps { Name = "Fps" }); // release builds: no node, zero overhead
         PrePositionCamera();
@@ -742,6 +757,14 @@ public partial class Game : Node3D
 
     // ---- online: spectator mode ----
 
+    /// <summary>Called when the host disconnects while guest is spectating.</summary>
+    private void HandleHostLeft()
+    {
+        GameOver = true;
+        Hud.ShowEndScreen(false, new List<string> { "主机已断开" });
+        Audio?.Play("defeat");
+    }
+
     public void ChooseMode(GameMode mode)
     {
         CurrentMode = mode;
@@ -771,19 +794,25 @@ public partial class Game : Node3D
     /// <summary>Host sends a compact game-state snapshot to the spectator.</summary>
     private void SendSnapshot()
     {
-        // send player position + nearest fortress HPs (compact)
+        if (!Multiplayer.HasMultiplayerPeer()) return;
         float px = Player != null ? Player.Position.X : 0f;
         float pz = Player != null ? Player.Position.Z : 0f;
-        Rpc(nameof(RpcSnapshot), px, pz, (int)(Player?.Hp ?? 0));
+        int hp = (int)(Player?.Hp ?? 0);
+        bool dead = Player?.Dead ?? false;
+        Rpc(nameof(RpcSnapshot), px, pz, hp, dead);
     }
 
     [Rpc(MultiplayerApi.RpcMode.Authority, CallLocal = false, TransferMode = MultiplayerPeer.TransferModeEnum.UnreliableOrdered)]
-    public void RpcSnapshot(float px, float pz, int hp)
+    public void RpcSnapshot(float px, float pz, int hp, bool dead)
     {
-        // guest: move the camera to follow the host's player position
         if (CurrentMode != GameMode.SpectatorGuest) return;
+        // guest: move the player proxy so the camera follows
         if (Player != null)
+        {
             Player.Position = new Vector3(px, 0f, pz);
+            Player.Hp = hp;
+            Player.Dead = dead;
+        }
     }
 
     [Rpc(MultiplayerApi.RpcMode.Authority, CallLocal = false, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]

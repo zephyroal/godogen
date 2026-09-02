@@ -122,6 +122,29 @@ public partial class Game : Node3D
 
         Net = new NetworkManager { Name = "Network" };
         AddChild(Net);
+        Net.OnPeerDisconnected += (_) =>
+        {
+            if (GameStarted && !GameOver && (CurrentMode == Mode.OnlineHost || CurrentMode == Mode.OnlineGuest))
+            {
+                CallDeferred(nameof(HandleOpponentLeft));
+            }
+        };
+        Net.OnDisconnected += () =>
+        {
+            if (GameStarted && !GameOver && (CurrentMode == Mode.OnlineHost || CurrentMode == Mode.OnlineGuest))
+            {
+                CallDeferred(nameof(HandleOpponentLeft));
+            }
+        };
+    }
+
+    /// <summary>Called when the online opponent disconnects mid-game.</summary>
+    private void HandleOpponentLeft()
+    {
+        GameOver = true;
+        Hud.SetTurn(null, false, 0);
+        Hud.ShowEnd(Side.Red == Position.Turn ? Side.Black : Side.Red, false);
+        Audio.Play("defeat");
     }
 
     private void SpawnPieces()
@@ -470,21 +493,31 @@ public partial class Game : Node3D
 
     // ---- online RPC ----
 
-    /// <summary>Send a move to the remote peer. Called locally after ExecuteMove.</summary>
+    /// <summary>Apply a move received from the remote peer.</summary>
     [Rpc(MultiplayerApi.RpcMode.AnyPeer, CallLocal = false, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
     public void RpcMove(int from, int to)
     {
-        if (CurrentMode == Mode.OnlineHost && Position.Turn == Side.Black)
-            ExecuteMove(new Move(from, to));
-        else if (CurrentMode == Mode.OnlineGuest && Position.Turn == Side.Red)
-            ExecuteMove(new Move(from, to));
+        // Only execute if it's the remote player's turn
+        bool remoteRed = CurrentMode == Mode.OnlineGuest; // guest is black, remote is red
+        bool remoteBlack = CurrentMode == Mode.OnlineHost; // host is red, remote is black
+        if (remoteRed && Position.Turn == Side.Red) ExecuteMove(new Move(from, to));
+        else if (remoteBlack && Position.Turn == Side.Black) ExecuteMove(new Move(from, to));
     }
 
-    /// <summary>Send a restart request to the remote peer.</summary>
+    /// <summary>Apply a restart request from the remote peer.</summary>
     [Rpc(MultiplayerApi.RpcMode.AnyPeer, CallLocal = false, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
     public void RpcRestart()
     {
         Rematch();
+    }
+
+    /// <summary>Notify the remote peer that the local player disconnected.</summary>
+    [Rpc(MultiplayerApi.RpcMode.AnyPeer, CallLocal = false, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    public void RpcOpponentLeft()
+    {
+        Audio.Play("illegal");
+        Hud.SetTurn(null, false, 0);
+        GameOver = true;
     }
 
     /// <summary>True if the local player is allowed to move in online mode.</summary>

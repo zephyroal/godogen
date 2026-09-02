@@ -138,42 +138,53 @@ public partial class HUD : CanvasLayer
         _startOverlay = new Control();
         _startOverlay.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         _startOverlay.MouseFilter = Control.MouseFilterEnum.Stop;
+        AddChild(_startOverlay);
+
         var dim = new ColorRect { Color = new Color(0f, 0f, 0f, 0.68f) };
         dim.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         _startOverlay.AddChild(dim);
 
-        // Title (center-top area, well above buttons)
-        var title = Shadowed(MkLabel("3D 中国象棋", 68, Gold, Godot.HorizontalAlignment.Center),
+        // Title
+        var title = Shadowed(MkLabel("3D 中国象棋", 64, Gold, Godot.HorizontalAlignment.Center),
             new Color(0f, 0f, 0f, 0.75f));
-        Anchor(title, Control.LayoutPreset.CenterTop, -400f, 80f, 400f, 170f);
+        title.OffsetLeft = 240f; title.OffsetTop = 60f;
+        title.OffsetRight = 1040f; title.OffsetBottom = 150f;
         _startOverlay.AddChild(title);
 
-        var sub = MkLabel("选择对局模式", 26, Cream, Godot.HorizontalAlignment.Center);
-        Anchor(sub, Control.LayoutPreset.CenterTop, -300f, 185f, 300f, 225f);
+        var sub = MkLabel("选择对局模式", 24, Cream, Godot.HorizontalAlignment.Center);
+        sub.OffsetLeft = 340f; sub.OffsetTop = 155f;
+        sub.OffsetRight = 940f; sub.OffsetBottom = 195f;
         _startOverlay.AddChild(sub);
 
-        // Three buttons: absolute-positioned, equal size, centered vertically
-        float btnW = 300f, btnH = 72f, gap = 16f;
-        float startY = 270f;
+        // Three buttons: all anchors = 0 (top-left origin), offsets define rect
+        float btnW = 300f, btnH = 72f, gap = 14f;
+        float btnX = (1280 - btnW) / 2f;
+        float y0 = 230f;
 
-        BtnVsAI = MkButton("人机对弈（执红先行）", 26);
+        BtnVsAI = MkButton("人机对弈（执红先行）", 24);
         BtnVsAI.CustomMinimumSize = new Vector2(btnW, btnH);
-        Anchor(BtnVsAI, Control.LayoutPreset.CenterTop, -btnW / 2f, startY, btnW / 2f, startY + btnH);
+        BtnVsAI.OffsetLeft = btnX; BtnVsAI.OffsetTop = y0;
+        BtnVsAI.OffsetRight = btnX + btnW; BtnVsAI.OffsetBottom = y0 + btnH;
         _startOverlay.AddChild(BtnVsAI);
 
-        BtnTwo = MkButton("双人对弈（同屏轮流）", 26);
+        float y1 = y0 + btnH + gap;
+        BtnTwo = MkButton("双人对弈（同屏轮流）", 24);
         BtnTwo.CustomMinimumSize = new Vector2(btnW, btnH);
-        Anchor(BtnTwo, Control.LayoutPreset.CenterTop, -btnW / 2f, startY + btnH + gap, btnW / 2f, startY + 2 * btnH + gap);
+        BtnTwo.OffsetLeft = btnX; BtnTwo.OffsetTop = y1;
+        BtnTwo.OffsetRight = btnX + btnW; BtnTwo.OffsetBottom = y1 + btnH;
         _startOverlay.AddChild(BtnTwo);
 
-        var btnOnline = MkButton("联机对战", 26);
+        float y2 = y1 + btnH + gap;
+        var btnOnline = MkButton("联机对战", 24);
         btnOnline.CustomMinimumSize = new Vector2(btnW, btnH);
-        Anchor(btnOnline, Control.LayoutPreset.CenterTop, -btnW / 2f, startY + 2 * (btnH + gap), btnW / 2f, startY + 3 * btnH + 2 * gap);
+        btnOnline.OffsetLeft = btnX; btnOnline.OffsetTop = y2;
+        btnOnline.OffsetRight = btnX + btnW; btnOnline.OffsetBottom = y2 + btnH;
         _startOverlay.AddChild(btnOnline);
 
         // Hint text (bottom center)
         var hint = MkLabel("单指点选 · 拖动旋转 · 双指缩放", 20, new Color(0.78f, 0.71f, 0.6f), Godot.HorizontalAlignment.Center);
-        Anchor(hint, Control.LayoutPreset.CenterBottom, -300f, -50f, 300f, -20f);
+        hint.OffsetLeft = 340f; hint.OffsetTop = 640f;
+        hint.OffsetRight = 940f; hint.OffsetBottom = 680f;
         _startOverlay.AddChild(hint);
 
         BtnVsAI.Pressed += () => { UIAnimator.FadeOut(_startOverlay, 0.2f, true); Game.Instance?.ChooseMode(Game.Mode.VsAI); };
@@ -185,10 +196,8 @@ public partial class HUD : CanvasLayer
 
         btnOnline.Pressed += () => { netPanel.Visible = true; UIAnimator.FadeIn(netPanel, 0.2f); };
 
-        // staggered fade-in entrance (alpha-only)
-        UIAnimator.StaggerIn(new Control[] { title, sub, BtnVsAI, BtnTwo, btnOnline, hint }, 0.08f, 0.35f);
+        // visible immediately — StaggerIn disabled to avoid capture timing issues
 
-        AddChild(_startOverlay);
     }
 
     private void BuildEndOverlay()

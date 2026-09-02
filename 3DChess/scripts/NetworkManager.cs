@@ -11,16 +11,60 @@ public partial class NetworkManager : Node
 
     public bool IsOnline => Multiplayer.HasMultiplayerPeer() && Multiplayer.GetPeers().Length > 0;
     public bool IsHost { get; private set; }
+    public long LocalPeerId => Multiplayer.GetUniqueId();
 
     public event Action OnConnected;
     public event Action OnDisconnected;
     public event Action<long> OnPeerConnected;
     public event Action<long> OnPeerDisconnected;
 
+    private bool _wasOnline;
+
     public override void _Ready()
     {
-        Multiplayer.PeerConnected += (id) => OnPeerConnected?.Invoke(id);
-        Multiplayer.PeerDisconnected += (id) => OnPeerDisconnected?.Invoke(id);
+        Multiplayer.PeerConnected += HandlePeerConnected;
+        Multiplayer.PeerDisconnected += HandlePeerDisconnected;
+        Multiplayer.ConnectedToServer += () => OnConnected?.Invoke();
+        Multiplayer.ConnectionFailed += HandleConnectionFailed;
+        Multiplayer.ServerDisconnected += HandleServerDisconnected;
+    }
+
+    public override void _Process(double delta)
+    {
+        // detect transition from online → offline (e.g. peer quit, network drop)
+        bool online = IsOnline;
+        if (_wasOnline && !online)
+        {
+            _wasOnline = false;
+            OnDisconnected?.Invoke();
+        }
+        _wasOnline = online;
+    }
+
+    private void HandlePeerConnected(long id)
+    {
+        _wasOnline = true;
+        OnPeerConnected?.Invoke(id);
+    }
+
+    private void HandlePeerDisconnected(long id)
+    {
+        OnPeerDisconnected?.Invoke(id);
+    }
+
+    private void HandleConnectionFailed()
+    {
+        GD.Print("[Net] 连接失败");
+        IsHost = false;
+        OnDisconnected?.Invoke();
+    }
+
+    private void HandleServerDisconnected()
+    {
+        GD.Print("[Net] 主机已断开");
+        IsHost = false;
+        _wasOnline = false;
+        OnDisconnected?.Invoke();
     }
 
     public Error Host(int port = DefaultPort)
@@ -38,6 +82,9 @@ public partial class NetworkManager : Node
 
     public Error Join(string ip, int port = DefaultPort)
     {
+        if (string.IsNullOrWhiteSpace(ip))
+            return Error.InvalidParameter;
+
         var peer = new ENetMultiplayerPeer();
         var err = peer.CreateClient(ip, port);
         if (err == Error.Ok)
@@ -56,6 +103,7 @@ public partial class NetworkManager : Node
             Multiplayer.MultiplayerPeer = null;
         }
         IsHost = false;
+        _wasOnline = false;
         OnDisconnected?.Invoke();
     }
 }

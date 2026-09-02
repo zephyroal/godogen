@@ -2,7 +2,7 @@ using Godot;
 
 namespace Xiangqi3D;
 
-/// <summary>Capture the start menu and end screen for UI verification.</summary>
+/// <summary>Capture the start menu for UI verification.</summary>
 public partial class UiCapture : SceneTree
 {
     private float _t;
@@ -16,13 +16,13 @@ public partial class UiCapture : SceneTree
     public override bool _Process(double delta)
     {
         _t += (float)delta;
-        if (_t >= 2.0f && _t < 2.1f)
+        if (_t >= 5.0f && _t < 5.1f)
         {
             var img = Root.GetTexture().GetImage();
             img.SavePng("res://screenshots/ui_start_menu.png");
             GD.Print("saved ui_start_menu.png");
         }
-        if (_t >= 1.0f)
+        if (_t >= 6.0f)
         {
             Quit(0);
             return true;

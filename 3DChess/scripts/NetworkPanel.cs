@@ -3,7 +3,7 @@ using Godot;
 namespace Xiangqi3D;
 
 /// <summary>Connection UI panel: host or join a networked match.
-/// Embeds into the start overlay alongside the single-player buttons.</summary>
+/// Uses absolute offsets (anchor=0,0,0,0) for reliable layout at 1280×720.</summary>
 public partial class NetworkPanel : Control
 {
     private Label _status;
@@ -21,63 +21,84 @@ public partial class NetworkPanel : Control
         dim.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         AddChild(dim);
 
-        var box = new VBoxContainer();
-        box.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-        box.Alignment = BoxContainer.AlignmentMode.Center;
-        box.AddThemeConstantOverride("separation", 18);
-        AddChild(box);
-
+        // Title
         var title = new Label { Text = "联机对战", HorizontalAlignment = Godot.HorizontalAlignment.Center };
         title.AddThemeFontOverride("font", UiFont());
         title.AddThemeFontSizeOverride("font_size", 36);
         title.Modulate = new Color(1f, 0.88f, 0.62f);
-        title.SizeFlagsHorizontal = SizeFlags.ShrinkCenter;
-        box.AddChild(title);
+        title.OffsetLeft = 390f; title.OffsetTop = 150f;
+        title.OffsetRight = 890f; title.OffsetBottom = 210f;
+        AddChild(title);
 
-        _hostBtn = MkBtn("做主机（等待对手加入）");
+        // Host button
+        _hostBtn = new Button { Text = "做主机（等待对手加入）", CustomMinimumSize = new Vector2(300, 60) };
+        _hostBtn.AddThemeFontOverride("font", UiFont());
+        _hostBtn.AddThemeFontSizeOverride("font_size", 22);
+        _hostBtn.OffsetLeft = 490f; _hostBtn.OffsetTop = 250f;
+        _hostBtn.OffsetRight = 790f; _hostBtn.OffsetBottom = 310f;
         _hostBtn.Pressed += OnHost;
-        box.AddChild(_hostBtn);
+        AddChild(_hostBtn);
 
+        // IP input
         _ipInput = new LineEdit
         {
             PlaceholderText = "输入主机 IP 地址",
-            CustomMinimumSize = new Vector2(250, 40),
             Text = "127.0.0.1",
+            CustomMinimumSize = new Vector2(300, 40),
         };
-        _ipInput.SizeFlagsHorizontal = SizeFlags.ShrinkCenter;
-        box.AddChild(_ipInput);
+        _ipInput.AddThemeFontOverride("font", UiFont());
+        _ipInput.AddThemeFontSizeOverride("font_size", 20);
+        _ipInput.OffsetLeft = 490f; _ipInput.OffsetTop = 340f;
+        _ipInput.OffsetRight = 790f; _ipInput.OffsetBottom = 380f;
+        AddChild(_ipInput);
 
-        _joinBtn = MkBtn("加入主机");
+        // Join button
+        _joinBtn = new Button { Text = "加入主机", CustomMinimumSize = new Vector2(300, 60) };
+        _joinBtn.AddThemeFontOverride("font", UiFont());
+        _joinBtn.AddThemeFontSizeOverride("font_size", 22);
+        _joinBtn.OffsetLeft = 490f; _joinBtn.OffsetTop = 400f;
+        _joinBtn.OffsetRight = 790f; _joinBtn.OffsetBottom = 460f;
         _joinBtn.Pressed += OnJoin;
-        box.AddChild(_joinBtn);
+        AddChild(_joinBtn);
 
+        // Status
         _status = new Label { Text = "", HorizontalAlignment = Godot.HorizontalAlignment.Center };
         _status.AddThemeFontOverride("font", UiFont());
         _status.AddThemeFontSizeOverride("font_size", 20);
         _status.Modulate = new Color(0.8f, 0.85f, 1f);
-        _status.SizeFlagsHorizontal = SizeFlags.ShrinkCenter;
-        box.AddChild(_status);
+        _status.OffsetLeft = 390f; _status.OffsetTop = 480f;
+        _status.OffsetRight = 890f; _status.OffsetBottom = 520f;
+        AddChild(_status);
 
-        _backBtn = MkBtn("返回");
+        // Back button
+        _backBtn = new Button { Text = "返回", CustomMinimumSize = new Vector2(150, 50) };
+        _backBtn.AddThemeFontOverride("font", UiFont());
+        _backBtn.AddThemeFontSizeOverride("font_size", 20);
+        _backBtn.OffsetLeft = 565f; _backBtn.OffsetTop = 550f;
+        _backBtn.OffsetRight = 715f; _backBtn.OffsetBottom = 600f;
         _backBtn.Pressed += () => { Visible = false; };
-        box.AddChild(_backBtn);
+        AddChild(_backBtn);
     }
 
     public void Init(NetworkManager net)
     {
+        if (net == null) return;
         _net = net;
         _net.OnPeerConnected += OnPeerConnected;
         _net.OnPeerDisconnected += OnPeerDisconnected;
+        _net.OnDisconnected += OnDisconnected;
     }
 
     private void OnHost()
     {
+        if (_net == null) return;
         var err = _net.Host();
         _status.Text = err == Error.Ok ? $"主机已创建 · 端口 {NetworkManager.DefaultPort} · 等待对手…" : $"创建失败: {err}";
     }
 
     private void OnJoin()
     {
+        if (_net == null) return;
         var err = _net.Join(_ipInput.Text.Trim());
         _status.Text = err == Error.Ok ? "连接中…" : $"连接失败: {err}";
     }
@@ -93,18 +114,14 @@ public partial class NetworkPanel : Control
         _status.Text = "对手已断开";
     }
 
+    private void OnDisconnected()
+    {
+        _status.Text = "连接已断开";
+    }
+
     private void StartOnlineGame()
     {
         Visible = false;
-        Game.Instance?.ChooseMode(_net.IsHost ? Game.Mode.OnlineHost : Game.Mode.OnlineGuest);
-    }
-
-    private Button MkBtn(string text)
-    {
-        var b = new Button { Text = text, CustomMinimumSize = new Vector2(250, 60) };
-        b.AddThemeFontOverride("font", UiFont());
-        b.AddThemeFontSizeOverride("font_size", 22);
-        b.SizeFlagsHorizontal = SizeFlags.ShrinkCenter;
-        return b;
+        Game.Instance?.ChooseMode(_net != null && _net.IsHost ? Game.Mode.OnlineHost : Game.Mode.OnlineGuest);
     }
 }
