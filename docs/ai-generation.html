@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Godogen — AI 生成技术全景报告</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --border: #30363d;
+    --text: #c9d1d9; --heading: #f0f6fc; --accent: #58a6ff;
+    --accent2: #3fb950; --warn: #d29922; --danger: #f85149;
+    --code-bg: #1c2129; --tag-bg: #21262d;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f6f8fa; --panel: #ffffff; --border: #d0d7de;
+      --text: #24292f; --heading: #1f2328; --accent: #0969da;
+      --accent2: #1a7f37; --warn: #9a6700; --danger: #cf222e;
+      --code-bg: #f0f2f4; --tag-bg: #eff2f5;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", "Noto Sans", "Microsoft YaHei", sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.7;
+    max-width: 980px; margin: 0 auto; padding: 24px 20px 80px;
+  }
+  h1 { color: var(--heading); font-size: 1.9em; margin: 32px 0 8px; letter-spacing: -0.02em; }
+  h1 + .subtitle { color: var(--warn); font-size: 0.85em; margin-bottom: 28px; }
+  h2 {
+    color: var(--heading); font-size: 1.35em; margin: 44px 0 14px;
+    padding-bottom: 8px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px;
+  }
+  h2 .num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0;
+    background: var(--accent); color: #fff; font-size: 0.72em; font-weight: 700;
+  }
+  h3 { color: var(--heading); font-size: 1.05em; margin: 24px 0 8px; }
+  p { margin: 8px 0; }
+  ul, ol { padding-left: 22px; margin: 8px 0; }
+  li { margin: 4px 0; }
+  strong { color: var(--heading); }
+  code {
+    font-family: "Cascadia Code", Consolas, "Courier New", monospace;
+    background: var(--code-bg); border: 1px solid var(--border);
+    padding: 1px 5px; border-radius: 4px; font-size: 0.86em;
+    color: var(--accent); white-space: nowrap;
+  }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px 16px; margin: 12px 0;
+    overflow-x: auto; font-size: 0.85em; line-height: 1.55;
+  }
+  pre code { background: none; border: none; padding: 0; color: var(--text); white-space: pre; }
+  table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 0.90em; }
+  th, td { border: 1px solid var(--border); padding: 7px 10px; text-align: left; }
+  th { background: var(--panel); color: var(--heading); font-weight: 600; }
+  tr:nth-child(even) { background: color-mix(in srgb, var(--panel) 50%, transparent); }
+  .tag {
+    display: inline-block; padding: 2px 9px; border-radius: 12px;
+    font-size: 0.76em; font-weight: 600; margin: 0 3px 3px 0;
+    background: var(--tag-bg); border: 1px solid var(--border);
+  }
+  .tag.api { color: var(--accent); border-color: var(--accent); }
+  .tag.cost { color: var(--warn); border-color: var(--warn); }
+  .tag.paid { color: var(--danger); border-color: var(--danger); }
+  .tag.tip { color: var(--accent2); border-color: var(--accent2); }
+  .card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px 18px; margin: 14px 0;
+  }
+  .card.danger { border-left: 4px solid var(--danger); }
+  .card.warn { border-left: 4px solid var(--warn); }
+  .card.tip { border-left: 4px solid var(--accent2); }
+  .card h4 { color: var(--heading); margin-bottom: 8px; font-size: 1em; }
+  .flow {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+    padding: 14px 0; font-size: 0.88em;
+  }
+  .flow .step {
+    background: var(--panel); border: 1px solid var(--accent);
+    padding: 5px 12px; border-radius: 8px; white-space: nowrap; color: var(--accent);
+  }
+  .flow .arrow { color: var(--border); font-weight: 700; }
+  .toc {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 18px 22px; margin: 24px 0;
+  }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .toc ol { counter-reset: toc; list-style: none; padding-left: 0; }
+  .toc li { margin: 6px 0; }
+  .toc li::before {
+    counter-increment: toc; content: counter(toc) ". ";
+    color: var(--accent); font-weight: 700; margin-right: 4px;
+  }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0; }
+  @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+  .kv { display: flex; gap: 8px; }
+  .kv .k { color: var(--accent); font-weight: 600; min-width: 130px; flex-shrink: 0; }
+  .path-list li { font-family: Consolas, monospace; font-size: 0.86em; }
+  footer { margin-top: 60px; padding-top: 16px; border-top: 1px solid var(--border); font-size: 0.82em; color: var(--warn); }
+</style>
+</head>
+<body>
+
+<h1>Godogen — AI 生成技术全景报告</h1>
+<div class="subtitle">D:\godogen · 生成日期 2026-09-02 · 范围：asset-gen REST 链路 + Codely MCP 链路 + 实操记忆</div>
+
+<div class="toc">
+<ol>
+  <li><a href="#arch">总体架构：双链路设计</a></li>
+  <li><a href="#pipeline-a">链路 A：本地 Python CLI（REST 付费 API）</a></li>
+  <li><a href="#tripo">Tripo3D 图生 3D 后端</a></li>
+  <li><a href="#pipeline-b">链路 B：Codely CLI 内置 MCP 工具（TJGenerator）</a></li>
+  <li><a href="#concept">概念图生成工作流（文生图 → 图生图 → 图生 3D）</a></li>
+  <li><a href="#audio">音效生成（sonilo）</a></li>
+  <li><a href="#glb">GLB 元数据清洗（scrub_glb.py）</a></li>
+  <li><a href="#glb-integrate">GLB 接入引擎（AABB 缩放对齐 + 回退）</a></li>
+  <li><a href="#cost">成本控制全景表</a></li>
+  <li><a href="#pitfalls">实战踩坑手册（排障经验）</a></li>
+  <li><a href="#files">关键文件索引</a></li>
+</ol>
+</div>
+
+<!-- ═══════════════ 1. 总体架构 ═══════════════ -->
+<h2 id="arch"><span class="num">1</span>总体架构：双链路设计</h2>
+
+<p>Godogen 本身不是游戏——它是<strong>"生成游戏仓库的生成器"</strong>源仓库。
+<code>publish.sh</code> 把运行时提示（CLAUDE.md/AGENTS.md）、引擎指南（<code>engines/*.md</code>）、
+资产生成技能（<code>asset-gen/</code>）发布到目标游戏仓库，由宿主 Agent（Claude Code / Codex / Codely CLI）
+实际驱动游戏与资产的生成。</p>
+
+<p>AI 资产生成分为<strong>两条独立链路</strong>：</p>
+
+<div class="flow">
+  <div class="step">链路 A：本地 Python CLI</div>
+  <div class="arrow">→</div>
+  <div class="step">Gemini 文生图/图生图</div>
+  <div class="arrow">/</div>
+  <div class="step">Grok 图像/视频</div>
+  <div class="arrow">/</div>
+  <div class="step">Tripo3D 图生 3D + 骨骼绑定 + 动画重定向</div>
+</div>
+
+<div class="flow">
+  <div class="step">链路 B：Codely CLI 内置 MCP</div>
+  <div class="arrow">→</div>
+  <div class="step">generate_3d_model（后端路由 Rodin）</div>
+  <div class="arrow">/</div>
+  <div class="step">generate_image / seedream</div>
+  <div class="arrow">/</div>
+  <div class="step">sonilo 音效</div>
+  <div class="arrow">→</div>
+  <div class="step">https://ai-generator.tuanjie.cn/mcp</div>
+</div>
+
+<table>
+  <tr><th></th><th>链路 A：asset-gen Python CLI</th><th>链路 B：Codely MCP（TJGenerator）</th></tr>
+  <tr><td><strong>调用方式</strong></td><td>本地 Python 脚本直接调用 REST API</td><td>MCP 协议（initialize → tools/call），由 Codely CLI 客户端完成</td></tr>
+  <tr><td><strong>认证</strong></td><td>环境变量 <code>GOOGLE_API_KEY</code> / <code>XAI_API_KEY</code> / <code>TRIPO3D_API_KEY</code></td><td>Codely OAuth（<code>oauth_creds.json</code> 的 access_token，非旧 mcp-oauth-tokens.json）</td></tr>
+  <tr><td><strong>仓库内代码</strong></td><td>✅ <code>asset-gen/tools/*.py</code>（完整源码）</td><td>❌ 无脚本——仅存在于 CODELY.md 记忆与需求文档中</td></tr>
+  <tr><td><strong>3D 生成</strong></td><td>Tripo3D v2 openapi（image_to_model）</td><td>Rodin（type=rodin_generation，provider/model_version 被后端忽略）</td></tr>
+  <tr><td><strong>成本确认</strong></td><td>SKILL.md 要求生成前须用户确认</td><td>Gen-2.5-High 必须传 <code>confirm_cost=true</code></td></tr>
+</table>
+
+<!-- ═══════════════ 2. 链路 A ═══════════════ -->
+<h2 id="pipeline-a"><span class="num">2</span>链路 A：本地 Python CLI（<code>asset_gen.py</code>）</h2>
+
+<p>核心 CLI 入口 <code>asset-gen/tools/asset_gen.py</code>，输出契约为 <strong>JSON stdout（含 cost_cents）</strong>。
+支持 6 个子命令：</p>
+
+<h3>image — 文生图 / 图生图</h3>
+<table>
+  <tr><th>Provider</th><th>模型</th><th>计费</th><th>说明</th></tr>
+  <tr><td>Gemini</td><td><code>gemini-3.1-flash-image-preview</code></td><td>512px=5 分 / 1K=7 分 / 2K=10 分 / 4K=15 分</td><td>14 种宽高比；图生图需指定 <code>--image</code></td></tr>
+  <tr><td>Grok</td><td><code>grok-imagine-image</code></td><td>2 分</td><td><code>xai_sdk.Client().image.sample()</code>；图生图走 base64 data URI</td></tr>
+</table>
+
+<h3>video — AI 视频生成</h3>
+<ul>
+  <li>Grok <code>grok-imagine-video</code>：5 分/秒，支持 1-15 秒，480p / 720p</li>
+  <li><code>xai_sdk.Client().video.generate()</code> → requests 下载 MP4</li>
+</ul>
+
+<h3>glb — 图生 3D 模型</h3>
+<ul>
+  <li>default = 30 分（30k 面，standard 精度）</li>
+  <li>hd = 60 分（detailed 精度）</li>
+  <li>底层调 <code>tripo3d.py</code>（见下节）</li>
+</ul>
+
+<h3>rig — 骨骼绑定</h3>
+<ul>
+  <li>+25 分，仅支持 biped（两足角色）</li>
+  <li>先调 <code>animate_prerigcheck</code> 校验 rig_type 合法性</li>
+</ul>
+
+<h3>retarget — 动画重定向</h3>
+<ul>
+  <li>10 分/clip，预设体系 <code>preset:biped:*</code>，约 130 个动画预设名</li>
+  <li><code>bake_animation=true</code> 烘焙到骨骼</li>
+</ul>
+
+<h3>resume — 断点恢复</h3>
+<ul>
+  <li>从 sidecar 文件 <code>&lt;output&gt;.tripo.json</code> 恢复超时任务，<strong>不重复计费</strong></li>
+</ul>
+
+<!-- ═══════════════ 3. Tripo3D ═══════════════ -->
+<h2 id="tripo"><span class="num">3</span>Tripo3D 图生 3D 后端</h2>
+
+<p><code>asset-gen/tools/tripo3d.py</code> — 完整 REST API 封装：</p>
+
+<pre><code>API_BASE = https://api.tripo3d.ai/v2/openapi
+认证: Bearer TRIPO3D_API_KEY
+
+流程:
+POST /upload          → image_token（上传参考图）
+POST /task            → { type: "image_to_model",
+                          model_version: "v3.1-20260211",
+                          face_limit / pbr / geometry_quality / texture_quality }
+GET  /task/{id}       → 轮询（600s 超时 / 5s 间隔）
+下载 output.pbr_model || model || base_model</code></pre>
+
+<ul>
+  <li>骨骼绑定 API：省略 model_version 自动使用 <code>v1.0-20240301</code></li>
+  <li>重定向 API：<code>animate_retarget</code>（bake_animation=true）</li>
+</ul>
+
+<!-- ═══════════════ 4. 链路 B ═══════════════ -->
+<h2 id="pipeline-b"><span class="num">4</span>链路 B：Codely MCP（TJGenerator / Rodin）</h2>
+
+<p>MCP 端点 <code>https://ai-generator.tuanjie.cn/mcp</code>。认证用 <code>oauth_creds.json</code> 的
+<code>access_token</code>（⚠️ 不是旧的 <code>mcp-oauth-tokens.json</code>）。
+调用需完整 MCP 会话：initialize → notifications/initialized → tools/call，
+PowerShell 下用 <code>--data-binary @file</code> 避免编码问题。</p>
+
+<h3>generate_3d_model — 3D 模型生成</h3>
+
+<div class="kv"><span class="k">实际路由</span><span>全部走 Rodin（type=<code>rodin_generation</code>）——传的 provider / model_version 被后端忽略</span></div>
+<div class="kv"><span class="k">质量杠杆</span><span><code>tier</code>（关键参数）+ <code>texture_mode=high</code></span></div>
+<div class="kv"><span class="k">face_limit</span><span>映射为 Rodin 的 qualityOverride</span></div>
+<div class="kv"><span class="k">产物</span><span>返回 <code>rodin_base_basic_pbr.glb</code> 的下载 URL</span></div>
+
+<table>
+  <tr><th>tier</th><th>耗时</th><th>质量</th><th>成本确认</th></tr>
+  <tr><td><code>Extreme-Low</code></td><td>~40 秒</td><td>快但糙（适合草稿验证）</td><td>不需要</td></tr>
+  <tr><td><code>Gen-2.5-High</code></td><td>3-10 分钟</td><td>正式产出档</td><td><strong>必须 <code>confirm_cost=true</code></strong></td></tr>
+</table>
+
+<div class="card danger">
+<h4>⚠ 高成本确认陷阱</h4>
+<p>Gen-2.5-High 不传 <code>confirm_cost=true</code> 时，返回积分确认提示但 CLI 无法解析，连续报
+<code>[Error: Could not parse tool response]</code>——曾连败 5 次误判为服务故障。</p>
+</div>
+
+<h3>generate_image / seedream — AI 绘图</h3>
+<ul>
+  <li>frontier 生图服务不稳定（2026-09-01 全天不可用）</li>
+  <li>降级 <strong>seedream</strong> 同样可靠——体素风 2048×2048 全过质检</li>
+  <li>批量提交后连续 parse error 多为<strong>提交限流</strong>，等 60-120 秒重试</li>
+</ul>
+
+<h3>排障绕行方案</h3>
+<div class="card tip">
+<h4>💡 provider=rodin 持续 parse error 时的绕行</h4>
+<p>改传 <code>provider=tripo</code> 可成功派发任务——后端仍实际路由
+<code>rodin_generation</code>（tier=Gen-2.5-Extreme-Low, PBR），最终质量相同。
+曾用此法成功派发 14 个任务。</p>
+</div>
+
+<div class="card warn">
+<h4>⚠ poll_command_powershell 陷阱</h4>
+<p>工具返回的 <code>poll_command_powershell</code> 内含 <code>function Try</code>——
+<code>Try</code> 是 PowerShell 保留字，直接执行必报解析错。
+派发轮询子代理时需将函数改名（如 <code>Poll1</code>）。</p>
+</div>
+
+<!-- ═══════════════ 5. 概念图 ═══════════════ -->
+<h2 id="concept"><span class="num">5</span>概念图生成工作流</h2>
+
+<div class="flow">
+  <div class="step">Design.png 设计表</div>
+  <div class="arrow">→</div>
+  <div class="step">文生图（生成概念图）</div>
+  <div class="arrow">→</div>
+  <div class="step">裁切/AI 生成 _lp 单图</div>
+  <div class="arrow">→</div>
+  <div class="step">图生图（统一风格/改色）</div>
+  <div class="arrow">→</div>
+  <div class="step">图生 3D（Rodin/Tripo3D）</div>
+  <div class="arrow">→</div>
+  <div class="step">GLB 接入引擎</div>
+</div>
+
+<h3>3DChess 概念图流程（7 类棋子 × 红黑 × 正背面）</h3>
+<ul>
+  <li>参考锚点：<code>3DChess/3DModel/Design.png</code> 的 CDN URL（<code>https://tuanjie-ai-prd.tos-cn-shanghai.volces.com/mcp-upload/...</code>）</li>
+  <li>风格锚点尾缀：<em>"no watermark, no other text"</em> + 显式刻字区分红黑
+    （帅/将、车、马、炮/砲、兵/卒、仕/士、相/象）</li>
+  <li>车、炮加 <em>"exactly two wheels"</em>（防止生成多轮或无轮）</li>
+  <li>最终 14 张 <code>*_lp.jpeg</code>（2048×2048 低多边形概念图）</li>
+  <li><code>chariot_black_lp</code> 通过图生图（以 red_lp 为参考 + 改色提示词）生成</li>
+</ul>
+
+<div class="card warn">
+<h4>⚠ 概念图质检规则（用户明确要求）</h4>
+<ul>
+  <li><strong>禁止后处理裁剪/缩放</strong>——用户明确否决此方案</li>
+  <li>红黑 V%/H% 差异 &gt;5% 时用 <strong>recolor</strong>（color-only edit）统一，不许像素级修复</li>
+  <li>车轮几何校验要防"透视借口"假 PASS——尺寸差 &gt;30% 或纵向异位一律 FAIL</li>
+  <li>改色用图生图（只 prompt 变化部分），SKILL.md 明确要求不要重复描述不变区域</li>
+</ul>
+</div>
+
+<h3>MiniGame 概念图流程（堡垒冲刺）</h3>
+<ul>
+  <li>15 张 PNG：<code>MiniGame/3DModel/concepts/</code>（castle、tower、tree、bush、coin、wall_segment、compound、spawn_pen、character、rubble 等）</li>
+  <li>配套 <code>ModelGapAnalysis.md</code> 跟踪已生成/缺失模型</li>
+</ul>
+
+<h3>抠图规范（rembg）</h3>
+<ul>
+  <li><strong>严禁 prompt "transparent background"</strong>——AI 会画棋盘格假透明</li>
+  <li>正确做法：纯色底生成 + <code>rembg_matting.py</code> 抠图</li>
+  <li>三模式 <code>trust</code> / <code>adapt</code> / <code>color</code> 按遮罩覆盖率自动选择</li>
+  <li><code>--preview</code> 出 <code>_qa.png</code> 供人工验收</li>
+</ul>
+
+<!-- ═══════════════ 6. 音效 ═══════════════ -->
+<h2 id="audio"><span class="num">6</span>音效生成（sonilo MCP 工具）</h2>
+
+<table>
+  <tr><th>特性</th><th>说明</th></tr>
+  <tr><td>时长吸附</td><td>固定档位——请求 2s → 实际 2.04s；请求 1.5s → 实际 1.02s</td></tr>
+  <tr><td>输出格式</td><td>立体声 44.1kHz 16bit WAV</td></tr>
+  <tr><td>转单声道</td><td>ffmpeg（WinGet 路径）<code>-ac 1</code></td></tr>
+  <tr><td>校验</td><td>先落盘后 Get-FileHash（同字节数 ≠ 同内容，必须比 hash）</td></tr>
+  <tr><td>BGM 计费</td><td>按秒计费——生成前须用户确认</td></tr>
+</table>
+
+<!-- ═══════════════ 7. scrub ═══════════════ -->
+<h2 id="glb"><span class="num">7</span>GLB 元数据清洗（scrub_glb.py）</h2>
+
+<p>根目录 <code>scrub_glb.py</code> — 清洗 AI 生成管线在 GLB/JPEG 中嵌入的厂商元数据：</p>
+
+<h3>GLB 清洗</h3>
+<ul>
+  <li>删除 <code>asset.extras</code> 和 <code>scenes[].extras</code>（生成管线的水印标识：
+    <code>{"author": "\"unity\"", "copyright": "\"tjai\"", "watermark_id": "\"\""}</code>）</li>
+  <li>重建 chunk 长度、紧凑重序列化 JSON（数值无损往返）</li>
+  <li>带 5 条 assert 校验：总长 / JSON 头 / extras 已删 / BIN chunk 字节不变</li>
+  <li>幂等：已清洗的文件不重复写入</li>
+</ul>
+
+<h3>JPEG 清洗</h3>
+<ul>
+  <li>删除 COM 段（payload 以 <code>MetaWatermark</code> 开头的水印注释）</li>
+  <li>删除 APP11 段（JUMBF / content-credentials 出处标记）</li>
+  <li>概念图体积降 ~40%（如 king_red_lp 342KB → 213KB）</li>
+</ul>
+
+<pre><code># 用法
+python scrub_glb.py &lt;dir_or_file&gt;
+# 输出 JSON 汇总: [{path, ok, status: clean|scrubbed, removed, old_total, new_total}]</code></pre>
+
+<p>配套 <code>scrub_glb.bat</code> 批处理（纯 ASCII 避开 cmd chcp 65001 解析错位 bug），
+一次清洗 MiniGame + 3DChess 三个目录。</p>
+
+<!-- ═══════════════ 8. GLB 接入 ═══════════════ -->
+<h2 id="glb-integrate"><span class="num">8</span>GLB 接入引擎（AABB 缩放对齐 + 程序化回退）</h2>
+
+<p>两个游戏共用同一套 GLB 接入模式——<strong>"GLB 优先加载 + AABB 缩放对齐 + 缺失时程序化回退"</strong>：</p>
+
+<h3>MiniGame — <code>scripts/Glb.cs</code></h3>
+<ul>
+  <li>按路径缓存 PackedScene（<code>Dictionary&lt;string, PackedScene&gt;</code>）</li>
+  <li>实例化 → 递归测量全部 Mesh 的合并 AABB（<strong>变换全部 8 角点</strong>，累积本地 Transform）</li>
+  <li>按目标高度缩放 + 底部对齐 y=0 + 足迹居中（归一化变换烘焙进实例根）</li>
+  <li>单层结构：<code>&lt;model&gt;_wrap_N</code>（placement）→ 实例（normalize transform）</li>
+  <li>文件缺失返回 null → 调用方回退程序化几何</li>
+  <li>同时提供 <code>ScaledHalfExtents()</code> 给 Fortress 计算城堡足迹占地</li>
+</ul>
+
+<h3>3DChess — <code>scripts/Piece.cs BuildFromGlb()</code></h3>
+<ul>
+  <li>按 (PieceType, Side) 缓存 PackedScene</li>
+  <li><code>MeasureAabb()</code> — 同样的 8 角点全变换算法（2026-09-02 修复：
+    原 <code>GetAabb</code> 只变换 min 角点 + 用 <code>GlobalTransform</code>，导致炮/士位置偏移几十单位）</li>
+  <li>按目标高度 & 底面直径取较小比例缩放</li>
+  <li>红方 180° 朝向修正（面向黑方）</li>
+  <li>GLB 缺失时回退 <code>BuildProcedural()</code>（圆柱+圆环+球体木质棋子）</li>
+</ul>
+
+<!-- ═══════════════ 9. 成本 ═══════════════ -->
+<h2 id="cost"><span class="num">9</span>成本控制全景表</h2>
+
+<table>
+  <tr><th>链路</th><th>操作</th><th>成本</th><th>确认机制</th></tr>
+  <tr><td rowspan="4">REST (asset_gen.py)</td><td>Grok 纹理生成</td><td>2 分</td><td rowspan="4">SKILL.md 要求生成前向用户报告并确认</td></tr>
+  <tr><td>Gemini 角色概念图 1K</td><td>7 分</td></tr>
+  <tr><td>Gemini 背景 2K</td><td>10 分</td></tr>
+  <tr><td>3D 全套（glb 默认档）</td><td>30 分</td></tr>
+  <tr><td rowspan="4">REST (进阶)</td><td>3D 全套 HD</td><td>60 分</td><td rowspan="4">同上</td></tr>
+  <tr><td>绑定角色 + 动画全套</td><td>92 分</td></tr>
+  <tr><td>Grok 视频</td><td>5 分/秒</td></tr>
+  <tr><td>动画重定向</td><td>10 分/clip</td></tr>
+  <tr><td rowspan="3">MCP (TJGenerator)</td><td>Rodin tier=Extreme-Low</td><td>低（~40s 快速档）</td><td>不需要确认</td></tr>
+  <tr><td>Rodin tier=Gen-2.5-High</td><td>高（3-10 分钟正式档）</td><td><strong>confirm_cost=true（硬性）</strong></td></tr>
+  <tr><td>sonilo BGM</td><td>按秒计费</td><td>须用户确认</td></tr>
+</table>
+
+<div class="card danger">
+<h4>⚠ 成本红线（CODELY.md 强制条款）</h4>
+<p>asset-gen 每次调用都是<strong>付费 API</strong>（Gemini / xAI Grok / Tripo3D），不得随意调用。
+生成前必须：① 明确告知用户预计成本 ② 获得用户确认 ③ 输出 cost_cents 供事后核算。</p>
+</div>
+
+<!-- ═══════════════ 10. 踩坑 ═══════════════ -->
+<h2 id="pitfalls"><span class="num">10</span>实战踩坑手册</h2>
+
+<div class="grid">
+  <div class="card danger">
+    <h4>MCP parse error 连续出现</h4>
+    <p>① 检查是否漏传 <code>confirm_cost=true</code>（高成本档）<br>
+    ② 批量提交后可能是限流——等 60-120 秒重试<br>
+    ③ rodin 持续报错改 <code>provider=tripo</code> 绕行</p>
+  </div>
+  <div class="card danger">
+    <h4>PowerShell 保留字冲突</h4>
+    <p><code>poll_command_powershell</code> 内含 <code>function Try</code>——PS 保留字，执行必报错。
+    派发子代理时函数改名（如 Poll1）。</p>
+  </div>
+  <div class="card warn">
+    <h4>OAuth token 认证错误</h4>
+    <p>必须用 <code>oauth_creds.json</code> 的 <code>access_token</code>——
+    不是旧的 <code>mcp-oauth-tokens.json</code>。</p>
+  </div>
+  <div class="card warn">
+    <h4>音效校验陷阱</h4>
+    <p>"同字节数 ≠ 同内容"——必须 Get-FileHash 比较。时长吸附固定档位，请求值与实际输出可能不符。</p>
+  </div>
+  <div class="card tip">
+    <h4>概念图透明底</h4>
+    <p>严禁 prompt "transparent background"（AI 画棋盘格）。用纯色底 + rembg 抠图，
+    <code>--preview</code> 出 _qa.png 人工验收。</p>
+  </div>
+  <div class="card tip">
+    <h4>frontier 生图服务不稳定</h4>
+    <p>不可用时降级 seedream——体素风 2048×2048 全过质检，同等可靠。</p>
+  </div>
+  <div class="card warn">
+    <h4>MCP 完整会话</h4>
+    <p>必须完整走 initialize → notifications/initialized → tools/call；
+    PowerShell 用 <code>--data-binary @file</code> 避免编码截断。</p>
+  </div>
+  <div class="card tip">
+    <h4>Tripo3D 超时恢复</h4>
+    <p><code>resume</code> 子命令从 <code>&lt;output&gt;.tripo.json</code> sidecar 恢复任务，
+    不重复计费。</p>
+  </div>
+</div>
+
+<!-- ═══════════════ 11. 文件索引 ═══════════════ -->
+<h2 id="files"><span class="num">11</span>关键文件索引</h2>
+
+<h3>核心工具（链路 A）</h3>
+<ul class="path-list">
+  <li><code>asset-gen/SKILL.md</code> — 技能规范、成本表、确认流程</li>
+  <li><code>asset-gen/tools/asset_gen.py</code> — CLI 入口（image/video/glb/rig/retarget/resume）</li>
+  <li><code>asset-gen/tools/tripo3d.py</code> — Tripo3D v2 REST API 封装</li>
+  <li><code>asset-gen/tools/rembg_matting.py</code> — AI 图像抠图（三模式自动选择）</li>
+  <li><code>asset-gen/tools/grid_slice.py</code> — 设计表网格切片</li>
+  <li><code>asset-gen/tools/find_loop_frame.py</code> — 动画循环帧检测</li>
+  <li><code>asset-gen/rembg.md</code> — 抠图规范（禁透底 prompt）</li>
+</ul>
+
+<h3>实操记忆（链路 B）</h3>
+<ul class="path-list">
+  <li><code>MiniGame/3DModel/CODELY.md</code> — Rodin MCP 实测备忘（tier/成本/排障）</li>
+  <li><code>3DChess/3DModel/CODELY.md</code> — 概念图/音效/Rodin 排障记忆</li>
+  <li><code>MiniGame/3DModel/3DModelRequirements.md</code> — 模型需求清单 + 提示词模板</li>
+  <li><code>3DChess/3DModel/3DModelRequirements.md</code> — 14 模型需求 + 7 套提示词</li>
+  <li><code>MiniGame/3DModel/ModelGapAnalysis.md</code> — 已生成/缺失模型追踪</li>
+</ul>
+
+<h3>引擎接入</h3>
+<ul class="path-list">
+  <li><code>MiniGame/scripts/Glb.cs</code> — GLB 加载 + AABB 缩放对齐 + 回退</li>
+  <li><code>MiniGame/scripts/Piece.cs</code>（3DChess）— 棋子 GLB 加载（MeasureAabb 8 角点全变换）</li>
+  <li><code>scrub_glb.py</code> / <code>scrub_glb.bat</code> — GLB/JPEG 元数据清洗</li>
+</ul>
+
+<h3>概念图资产</h3>
+<ul class="path-list">
+  <li><code>3DChess/3DModel/Design.png</code> — 7 类 × 红黑设计表（图生图参考锚点）</li>
+  <li><code>3DChess/3DModel/concepts/*_lp.jpeg</code> — 14 张 2048×2048 低多边形概念图</li>
+  <li><code>MiniGame/3DModel/concepts/*.png</code> — 15 张场景/角色概念图</li>
+</ul>
+
+<h3>发布与配置</h3>
+<ul class="path-list">
+  <li><code>publish.sh</code> — 发布引擎指南 + asset-gen 技能到目标游戏仓库</li>
+  <li><code>setup.md</code> — API keys 三件套 + 环境依赖</li>
+  <li><code>docs/PROJECT.md</code> — 架构哲学：证明优先于声明 / 成本感知资产生成</li>
+  <li><code>docs/demo_prompts.md</code> — 4 个完整游戏 brief 示例</li>
+</ul>
+
+<h3>API Keys（环境变量）</h3>
+<pre><code>GOOGLE_API_KEY    # Gemini 文生图/图生图
+XAI_API_KEY       # Grok 图像/视频
+TRIPO3D_API_KEY   # 图生 3D + 骨骼 + 动画</code></pre>
+
+<footer>
+  Generated by Codely CLI · 2026-09-02 · Based on full-repo code exploration + CODELY.md operational memories<br>
+  Scope: D:\godogen (excluding engine source godot/ and Godot_v4.7.1 installation directory)
+</footer>
+
+</body>
+</html>

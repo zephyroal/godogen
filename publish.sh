@@ -2,8 +2,8 @@
 # Publish Godogen runtime files into a target game repo.
 #
 # Usage:
-#   ./publish.sh --engine godot|bevy|babylon --agent claude|codex --out <dir> [--force]
-#   ./publish.sh --engine godot|bevy|babylon --agent claude|codex <dir> [--force]
+#   ./publish.sh --engine godot|bevy|babylon|cocos2dx --agent claude|codex --out <dir> [--force]
+#   ./publish.sh --engine godot|bevy|babylon|cocos2dx --agent claude|codex <dir> [--force]
 #
 # A published repo carries only docs: the runtime manifest (CLAUDE.md / AGENTS.md),
 # a per-engine guide (<engine>.md), and the asset-gen skill. The agent scaffolds
@@ -45,7 +45,8 @@ case "$ENGINE" in
     godot)   ENGINE_DISPLAY="Godot" ;;
     bevy)    ENGINE_DISPLAY="Bevy" ;;
     babylon) ENGINE_DISPLAY="Babylon.js" ;;
-    *) echo "error: --engine must be godot, bevy, or babylon" >&2; usage; exit 1 ;;
+    cocos2dx) ENGINE_DISPLAY="Cocos2d-x" ;;
+    *) echo "error: --engine must be godot, bevy, babylon, or cocos2dx" >&2; usage; exit 1 ;;
 esac
 
 # Root for runtime-loaded generated assets, substituted into the asset docs.
@@ -143,6 +144,9 @@ if [ ! -f "$TARGET/.gitignore" ]; then
                 ;;
             babylon)
                 printf '/node_modules\n/dist\n/screenshots\n'
+                ;;
+            cocos2dx)
+                printf '/build\n/screenshots\nResources-out\n'
                 ;;
         esac
     } > "$TARGET/.gitignore"

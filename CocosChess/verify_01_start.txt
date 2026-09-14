@@ -1,0 +1,9 @@
+5 4 3 2 1 2 3 4 5 0 0 0 0 0 0 0 0 0 0 6 0 0 0 0 0 6 0 7 0 7 0 7 0 7 0 7 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -7 0 -7 0 -7 0 -7 0 -7 0 -6 0 0 0 0 0 -6 0 0 0 0 0 0 0 0 0 0 -5 -4 -3 -2 -1 -2 -3 -4 -5
+turn Red
+moveCount 0
+history 0
+alive 32
+redCaptured 0 blackCaptured 0
+inCheck 0
+gameStarted 1 gameOver 0
+animating 0 aiThinking 0

@@ -1,0 +1,142 @@
+[
+ {
+  "file": "advisor_black.xmodel",
+  "source": "D:/godogen/3DChess/assets/glb\\advisor_black.glb",
+  "verts": 4511,
+  "tris": 3690,
+  "baked_scale": 0.40672,
+  "height_world": 0.7838,
+  "tex_kb": 909,
+  "out_kb": 1072
+ },
+ {
+  "file": "advisor_red.xmodel",
+  "source": "D:/godogen/3DChess/assets/glb\\advisor_red.glb",
+  "verts": 4563,
+  "tris": 3960,
+  "baked_scale": 0.41493,
+  "height_world": 0.7837,
+  "tex_kb": 878,
+  "out_kb": 1044
+ },
+ {
+  "file": "cannon_black.xmodel",
+  "source": "D:/godogen/3DChess/assets/glb\\cannon_black.glb",
+  "verts": 7187,
+  "tris": 5840,
+  "baked_scale": 0.42169,
+  "height_world": 0.7829,
+  "tex_kb": 770,
+  "out_kb": 1029
+ },
+ {
+  "file": "cannon_red.xmodel",
+  "source": "D:/godogen/3DChess/assets/glb\\cannon_red.glb",
+  "verts": 7463,
+  "tris": 5922,
+  "baked_scale": 0.42147,
+  "height_world": 0.7322,
+  "tex_kb": 933,
+  "out_kb": 1201
+ },
+ {
+  "file": "chariot_black.xmodel",
+  "source": "D:/godogen/3DChess/assets/glb\\chariot_black.glb",
+  "verts": 8986,
+  "tris": 5760,
+  "baked_scale": 0.42382,
+  "height_world": 0.7253,
+  "tex_kb": 975,
+  "out_kb": 1290
+ },
+ {
+  "file": "chariot_red.xmodel",
+  "source": "D:/godogen/3DChess/assets/glb\\chariot_red.glb",
+  "verts": 7508,
+  "tris": 5806,
+  "baked_scale": 0.42196,
+  "height_world": 0.5367,
+  "tex_kb": 817,
+  "out_kb": 1086
+ },
+ {
+  "file": "elephant_black.xmodel",
+  "source": "D:/godogen/3DChess/assets/glb\\elephant_black.glb",
+  "verts": 6319,
+  "tris": 3814,
+  "baked_scale": 0.42717,
+  "height_world": 0.7527,
+  "tex_kb": 987,
+  "out_kb": 1207
+ },
+ {
+  "file": "elephant_red.xmodel",
+  "source": "D:/godogen/3DChess/assets/glb\\elephant_red.glb",
+  "verts": 6015,
+  "tris": 3762,
+  "baked_scale": 0.44389,
+  "height_world": 0.836,
+  "tex_kb": 1085,
+  "out_kb": 1295
+ },
+ {
+  "file": "horse_black.xmodel",
+  "source": "D:/godogen/3DChess/assets/glb\\horse_black.glb",
+  "verts": 8659,
+  "tris": 5646,
+  "baked_scale": 0.4672,
+  "height_world": 0.8865,
+  "tex_kb": 806,
+  "out_kb": 1110
+ },
+ {
+  "file": "horse_red.xmodel",
+  "source": "D:/godogen/3DChess/assets/glb\\horse_red.glb",
+  "verts": 8428,
+  "tris": 5676,
+  "baked_scale": 0.45462,
+  "height_world": 0.8619,
+  "tex_kb": 974,
+  "out_kb": 1271
+ },
+ {
+  "file": "king_black.xmodel",
+  "source": "D:/godogen/3DChess/assets/glb\\king_black.glb",
+  "verts": 8375,
+  "tris": 5878,
+  "baked_scale": 0.43395,
+  "height_world": 0.821,
+  "tex_kb": 1295,
+  "out_kb": 1592
+ },
+ {
+  "file": "king_red.xmodel",
+  "source": "D:/godogen/3DChess/assets/glb\\king_red.glb",
+  "verts": 7725,
+  "tris": 5886,
+  "baked_scale": 0.45069,
+  "height_world": 0.8646,
+  "tex_kb": 1235,
+  "out_kb": 1511
+ },
+ {
+  "file": "soldier_black.xmodel",
+  "source": "D:/godogen/3DChess/assets/glb\\soldier_black.glb",
+  "verts": 5421,
+  "tris": 3762,
+  "baked_scale": 0.35725,
+  "height_world": 0.6793,
+  "tex_kb": 823,
+  "out_kb": 1015
+ },
+ {
+  "file": "soldier_red.xmodel",
+  "source": "D:/godogen/3DChess/assets/glb\\soldier_red.glb",
+  "verts": 5429,
+  "tris": 3702,
+  "baked_scale": 0.36076,
+  "height_world": 0.6793,
+  "tex_kb": 910,
+  "out_kb": 1101
+ }
+]

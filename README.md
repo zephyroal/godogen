@@ -1,6 +1,6 @@
 # Godogen
 
-Autonomous game development for Godot, Bevy, and Babylon.js with Claude Code and Codex.
+Autonomous game development for Godot, Bevy, Babylon.js, and Cocos2d-x with Claude Code and Codex.
 
 [![Watch the video](https://img.youtube.com/vi/eUz19GROIpY/maxresdefault.jpg)](https://youtu.be/eUz19GROIpY)
 
@@ -16,7 +16,7 @@ A published repo is intentionally thin: a runtime manifest, a one-page engine gu
 
 - `prompts/runtime.md` — the runtime manifest
 - `asset-gen/` — the cross-engine asset-generation skill
-- `engines/babylon.md`, `engines/godot.md`, `engines/bevy.md` — per-engine guides
+- `engines/babylon.md`, `engines/godot.md`, `engines/bevy.md`, `engines/cocos2dx.md` — per-engine guides
 - [publish.sh](publish.sh) — renders the runtime layout for the chosen engine and host agent
 
 Engine and host agent (Claude vs Codex) are publish-time render choices, not separate source trees.
@@ -26,6 +26,7 @@ Engine and host agent (Claude vs Codex) are publish-time render choices, not sep
 - **Godot 4** — C#/.NET projects with build-time scene generation, runtime scripts, and Jolt physics.
 - **Bevy** — Rust/Bevy projects with code-first ECS scenes and offscreen capture.
 - **Babylon.js** — TypeScript/Vite browser games served at a live URL.
+- **Cocos2d-x 4** — C++17/CMake desktop games against a source checkout of the engine, with procedural 2D/3D (DrawNode, Label, Sprite3D meshes) and no asset pipeline.
 - **Asset generation** — Gemini for precise references and characters, xAI Grok for textures and simple objects, Tripo3D for image-to-3D and rigged biped animation; animated sprites via Grok video with loop detection and background removal.
 - **Proof over claims** — the agent judges results from the running game (a live URL or a recorded clip), not from a clean compile, so visible defects drive the next iteration.
 - **You choose your involvement** — watch the live game (a Babylon.js URL, or a Godot/Bevy project you run) and steer at decision points, or leave the run unattended and get a 15–20s proof recording at the end. The agent takes its cue from how you frame the task.
@@ -37,6 +38,7 @@ Engine and host agent (Claude vs Codex) are publish-time render choices, not sep
 - [Godot 4](https://godotengine.org/download/) (.NET build) on `PATH` for Godot projects
 - Rust/Cargo for Bevy projects
 - Node.js 22.12+ and npm for Babylon.js projects
+- CMake ≥ 3.18 and a C++17 toolchain (MSVC with the "Desktop development with C++" workload on Windows) plus a cocos2d-x v4 source checkout for Cocos2d-x projects
 - Chrome or Chromium with hardware WebGL2 for Babylon.js browser capture
 - Python 3 with pip
 - API keys as environment variables:
@@ -55,6 +57,7 @@ Pick the engine and host agent:
 ./publish.sh --engine godot   --agent claude --out ~/my-game       # CLAUDE.md + .claude/skills/
 ./publish.sh --engine babylon --agent codex  --out ~/my-game       # AGENTS.md + .agents/skills/
 ./publish.sh --engine bevy    --agent claude --out ~/my-game
+./publish.sh --engine cocos2dx --agent claude --out ~/my-game
 ```
 
 Pass `--force` to wipe existing contents at the target before re-publishing.

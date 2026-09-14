@@ -17,8 +17,11 @@
 
 ## 2. 棋盘
 
+> 2026-09-14 起本表颜色为**参照帧实测渲染值**（Godot albedo × 其灯光链路 + tonemap 后的实际显示，
+> 采样自 result/frame00000200.png 与 01_opening.png），替代原先的源码 albedo 值——unlit 直读
+> albedo 会比参照渲染暗一整档。
+
 | 参数 | Godot 值 | Cocos 当前值 | 差异 |
-|---|---|---|---|
 | 桌面(desk) | 11.5×0.8×12.5 @ y=-0.55, 深木纹 | 无（仅 slab） | ❌ 加桌面层 |
 | 台面(slab) | 9.6×0.32×10.6 @ y=-0.16 | 9.6×0.32×10.8 @ y=-0.16 | 尺寸近似 ✔ |
 | 桌面颜色 | 深木(0.34,0.22,0.13)/(0.19,0.11,0.06), UV(3,2) | 无 | ❌ |
@@ -118,18 +121,79 @@
 
 ## 同步实施优先级
 
-| 优先级 | 项目 | 影响 |
+2026-09-10 晚间已完成第 2 轮同步（CocosChess 3D 化 + 参数对齐），状态如下：
+
+| 优先级 | 项目 | 状态 |
 |---|---|---|
-| P0 | 相机角度/FOV/距离 | 整体视角感受 |
-| P0 | 棋子颜色（木色红黑/环色） | 棋子材质观感 |
-| P0 | 汉字平躺朝上（替换 BillBoard） | 最关键的辨识度差异 |
-| P1 | 棋子5段几何体（加底座+圆顶） | 剪影匹配 |
-| P1 | 棋盘双层+桌面+边框 | 棋盘厚重感 |
-| P1 | 移动弧线动画 | 动态体验 |
-| P1 | 高亮标记发光+脉冲 | 交互反馈 |
-| P2 | 选中悬浮+自转 | 选中体验 |
-| P2 | 捕获托盘 | 空间布局 |
-| P2 | AI 评估函数完整版 | AI 强度对齐 |
-| P2 | 音效文件复制 | 听觉体验 |
-| P3 | 尘土特效 | 落地反馈 |
-| P3 | 相机拖拽旋转+缩放 | 自由视角 |
+| P0 | 相机角度/FOV/距离 | ✅ 38°/0.88/14.2，含拖拽轨道 + 双指缩放（Lerp dt*6） |
+| P0 | 棋子颜色（木色红黑/环色） | ✅ 与 Piece.cs 材质值一致 |
+| P0 | 汉字平躺朝上 | ✅ 32/32 渲染可读（红方正读、黑方 RotateY(π)）；黑方远端透视偏小属正常 |
+| P1 | 棋子5段几何体 | ✅ 底座+身+环+顶盖+圆顶，身高按 GLB TargetHeight 分型拉伸 |
+| P1 | 棋盘双层+桌面+边框+板条 | ✅ desk/slab/边框/9 板条条纹 |
+| P1 | 移动弧线动画 | ✅ 0.45s、弧高 0.55/吃子 0.9/入盘 2.2（sine 弧，非 Action） |
+| P1 | 高亮标记发光+脉冲 | ✅ 选环 1+0.08sin(4t)、走点 1+0.12sin(5t)、将军环 1+0.16sin(6t)、上一步角框 |
+| P2 | 选中悬浮+自转 | ✅ y=0.32+0.04sin(4t)、1.4 rad/s |
+| P2 | 捕获托盘 | ✅ 左红右黑、槽位公式一致、入盘缩放 0.82 |
+| P2 | AI 评估函数完整版 | ✅ 子力价值/全项评估/多样性(≥best-10 随机)/900ms 全对齐 AI.cs |
+| P2 | 音效文件复制 | ✅ game_start/victory/defeat/checkmate/ai_thinking(循环) 已接 AudioEngine |
+| P3 | 尘土特效 | ✅ 池化碎屑（0.14 立方体、上抛 90°、重力 -12、0.7s），渲染待实机确认 |
+| P3 | 相机拖拽旋转+缩放 | ✅ 单指拖拽 orbit + 双指 pinch（clamp 0.45..1.35 / 7..20） |
+
+**仍未复刻（引擎能力差异，compare 表已注明）**：阴影/SSAO/SDFGI/Glow、木纹纹理（v4 unlit + 纯色）、吃子镜头拉近（Godot 侧也标注"后续迭代"）。
+
+**Cocos 侧额外发现（真机验证得出，已写入 engines/cocos2dx.md）**：
+- v4 `CameraFlag`：DEFAULT=1、USER1=1<<1=2（非 v3 的 256）；相机掩码按节点逐个判定，**父节点掩码不会覆盖后添加的子节点**——托盘/角框/提示点三类节点都栽在这里
+- 多相机：3D 相机 `setDepth(-1)` 先渲 + `Director::setClearColor` 背景；2D UI 保持 DEFAULT 掩码走正交相机
+- 拾取：`getLocation()`（左下原点）必须配 `unprojectGL`；`unproject` 期望左上原点——配错则拾取上下镜像
+- 系统字体 Label 在 3D 相机下按 TrianglesCommand（带深度测试）渲染：字模 quad 必须整体浮出棋子圆顶（yDome+0.32），部分嵌入会被深度裁剪表现为"无字"
+- `captureScreen` 取证中发现：运行时重定位的池化小标记在截图中不可见（选中环/角框正常）——待实机目测确认是否仅截图路径的怪癖
+- **Sprite3D::draw 的自动材质切换（2026-09-14 发现的重大陷阱）**：场景存在任何灯光时，首帧 draw 会把所有 `_lightMask` 匹配灯的 Sprite3D 自动 `genMaterial(true)` 换成 lit 材质——unlit 棋盘/标记被静默替换后只吃到 ~0.5 环境光（无方向光贡献），整套颜色压半；显式绑定的白色纹理也随材质替换失效。修复：所有 unlit 网格 `setLightMask(0)`（折入 `BindWhiteTexture` 助手），GLB 棋子保持默认掩码走 lit 管线。
+- **unlit 空纹理槽泄漏**：`3D_colorTexture.frag` 盲采样 `u_texture`，未绑纹理的网格会采到管线里上一个绑定的纹理（GLB 木纹把棋盘染黑）；引擎 `getDummyTexture` 在 Release 是 1×1 透明黑，不能当白色用。修复：真加载一张 2×2 白 PNG，且必须在 `genMaterial` **之前** `setTexture`（`Mesh::setMaterial` 的回放路径才会进 pass——与 GLB 棋子同一条已证链路）。
+- 亮度校准实证（`hist_check` 直方图）：修复后台面全亮像素 601→55,121（参照 77,551）、托盘 27,266 vs 参照 27,554 几乎逐像素一致、半亮像素归零（52,628→93）。
+
+## 10. 对局流程与联机（2026-09-11 完成）
+
+参照 Godot `Game.cs`/`HUD.cs`/`NetworkPanel.cs`/`NetworkManager.cs`/`UIAnimator.cs` 补齐玩法层：
+
+| 功能 | Godot 实现 | Cocos 实现 | 状态 |
+|---|---|---|---|
+| 开局模式选择屏 | HUD.BuildStartOverlay（三按钮+标题+提示，FadeOut 0.2s） | LayerColor 遮罩 + Menu/MenuItemLabel 文字按钮 | ✅ 实机截图验证 |
+| 双人同屏模式 | Mode.TwoPlayers，IsLocalTurn 恒真 | Mode 枚举 + 输入门改造，AI 不启动 | ✅ |
+| 悔棋 | Position.History + UnmakeMove，VsAI 回 2/1 步、联机禁用、U 键 | moveHistory_ 栈 + Position::UndoMove + 托盘复活/计数回退 | ✅ `--verify` 46 项断言（含被吃子托盘复活） |
+| 再来一局/菜单 | 场景重载 + AutoStart | ResetMatch 手动复位 + 同模式 ChooseMode | ✅ |
+| 结束遮罩 | 胜负标题+绝杀/困毙原因+按钮，FadeIn+SlideIn | LayerColor + Label + Menu，FadeIn/Spawn(MoveBy) | ✅ |
+| 「将军！」HUD 闪屏 | 54pt 红字 1.6s + Shake(10, 0.35) | checkFlashLabel + 手工衰减震动 | ✅ |
+| U/R 快捷键 | _Input 监听 | EventListenerKeyboard | ✅ |
+| 终局庆祝粒子 | FX.Burst 42 粒金色（败方王上）+ 0.8s 延迟胜负音 | SpawnDebris(42, 金色) + 既有延迟音效 | ✅ |
+| 吃子镜头拉近 | _focusTimer 1.2s、6.0 距离 | focusPos_/focusTimer_ 同构 | ✅ `--verify` 截图实证（吃子瞬间拉近+闪屏同帧） |
+| 鼠标悬停高亮 | Board.ShowHover（cyl 0.13×0.02，白 0.22α） | hoverMark_ 圆盘（无透明混合，用浅色近似） | ✅ |
+| FPS 角标 | Fps 节点（debug） | 左上角 Label 0.5s 刷新 | ✅ 截图可见 |
+| 联机对战 | ENet P2P 端口 5005、RpcMove/RpcRestart/RpcOpponentLeft、断线判胜 | NetPlayer：winsock TCP + 13 字节帧 + 接收线程；主机红/客户端黑门控；断线本方判胜 | ✅ 双开自动验证（棋盘逐格一致） |
+
+**有意差异**（不逐字复刻 Godot）：
+- 对手断线：Godot 判"当前行棋方为负"（语义可疑），Cocos 版判**本方胜利**
+- IP 输入：Godot 用 LineEdit，Cocos 版用键盘输入（KEY_0..9/点/退格，无 ui::TextField/IME 依赖）
+- 按钮：Godot 用 Button + StyleBoxFlat，Cocos 版用 MenuItemLabel 文字按钮（零贴图）
+- 状态栏在未开局时隐藏（避免与选择屏副标题重复）
+
+## 11. 真实 GLB 模型接入（2026-09-11 完成）
+
+Godot 参照版 `Piece.cs` 优先加载 `assets/glb/<type>_<side>.glb`——Tripo3D 生成的**立体造型件**
+（帅=金铜小人、车=小推车、卒=伞盖；模型自带造型区分、**无刻字**；GLB 分支红方 RotateY(π)）。
+cocos2d-x v4 没有 glTF 加载器，链路：`tools/glb_to_xmodel.py` 离线展平（网格按 Godot 的
+TargetHeight/0.84 直径 min 公式烘焙缩放、底面对齐 y=0、XZ 居中，附 baseColor JPEG）→
+运行时 `LoadXModel` 构建 Mesh + `Mesh::setTexture`（diffuse）→ `genMaterial(true)`（lambert）
+→ 场景加 AmbientLight + DirectionLight（棋盘/标记仍 unlit，不受灯光影响）。
+
+| 项 | 状态 |
+|---|---|
+| 14 模型（7 型 × 红黑）网格+贴图 | ✅ 32/32 渲染正确（双端截图比对，60 FPS） |
+| 光影 | ✅ 受光/背光明暗过渡成立（lambert + 环境光 96,88,80 + 方向光 1.15） |
+| 朝向 | ✅ 红方 RotateY(π)（镜像 Godot GLB 分支）；baseYaw 记入 PieceRef，悔棋/重开/选中回落一致 |
+| 缩放/对齐 | ✅ 转换器离线烘焙（与 MeasureAabb→min(H/D)×0.95 公式一致） |
+| 模型/贴图缓存 | ✅ 按路径缓存，32 子共享 14 份（每张 JPEG 解码一次），boot 截图 ≈ 5.9s |
+| 联机双开 | ✅ 双端棋局状态逐行一致；客户端截图为在局内光照模型 |
+
+**已知保真差异**：黑方车底座在 albedo 贴图本身偏粉（源数据如此；Godot 用完整 PBR 把它压成
+深棕，我们的 lambert 偏亮时更明显）；法线/金属度贴图未使用（引擎无切线空间流水线）；无阴影
+（无 shadow map，见 §6）。程序化五段几何保留为模型缺失时的回退路径。

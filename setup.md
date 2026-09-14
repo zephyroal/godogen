@@ -55,6 +55,20 @@ export CHROME_BIN=/path/to/chrome
 
 Babylon capture prefers hardware WebGL2. A fallback to a software renderer (SwiftShader, llvmpipe, lavapipe, etc.) on a GPU-equipped host means the browser GPU path is misconfigured and worth fixing; on a GPU-less host it still captures, at reduced quality and speed.
 
+## Cocos2d-x 4
+
+Cocos2d-x projects are C++17/CMake builds against a **source checkout** of the engine — there is no installed SDK:
+
+```bash
+git clone --depth 1 --branch v4 https://github.com/cocos2d/cocos2d-x.git ~/cocos2d-x
+cd ~/cocos2d-x
+python3 download-deps.py -r no   # prebuilt third-party libs; -r auto-answers the prompt
+```
+
+- CMake ≥ 3.18 on `PATH`.
+- Windows: MSVC (Visual Studio "Desktop development with C++" workload). The v4 prebuilt third-party libraries are **32-bit only** — configure with `cmake -A Win32` (the engine guide has the full build recipe).
+- Linux: `build-essential` plus the engine's dev libraries (`libgl1-mesa-dev`, `libgtk-3-dev`, `libpulse-dev`).
+
 ## System Packages
 
 ```bash

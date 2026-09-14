@@ -1,5 +1,11 @@
 # Changelog
 
+**2026-09-10 — Cocos2d-x support**
+- Added Cocos2d-x 4 as a first-class engine alongside Godot, Bevy, and Babylon.js: C++17/CMake desktop projects built against a source checkout of the engine — no installed SDK, no asset pipeline.
+- Procedural-first rendering: DrawNode/Label for 2D, Sprite3D with hand-built Mesh geometry for 3D, so a game can render with zero image/model assets.
+- The engine guide carries the platform traps verified by a full generated run (a 3D Xiangqi synced to the Godot reference render): Windows `-A Win32` (the v4 prebuilt third-party libs are 32-bit), MSVC `/utf-8` for CJK sources, the `cocos2d` link target and exe layout, the v4 `CameraFlag` values, and the camera-mask/unproject pitfalls of mixing 2D UI with a 3D camera.
+- `publish.sh` extended to `--engine cocos2dx`.
+
 **2026-07-02 — Docs-only runtime**
 - Replaced the multi-stage skill pipeline with a thin runtime: a single engine-agnostic manifest (`prompts/runtime.md`), a one-page per-engine guide, and the cross-engine `asset-gen` skill. The model plans, scaffolds, and decomposes the work itself.
 - One runtime manifest covers delivery. The agent reads how the task is framed in-run: an open-ended direction gets the live game early and checkpoints at taste/scope/cost decisions; a finished brief runs on reasonable calls and closes with a 15–20s proof recording, watched back before done. Run/show/capture mechanics live in the engine guides and serve both paths.

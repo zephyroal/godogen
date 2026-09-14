@@ -13,6 +13,7 @@ Supported engine × host-agent targets (render-time choices over one source tree
 - **Godot 4** (.NET/C#, Jolt physics, build-time scene generation, `--write-movie` capture)
 - **Bevy** (Rust, code-first ECS, offscreen `RenderTarget::Image` capture)
 - **Babylon.js** (TypeScript/Vite, live URL, headless Chrome capture)
+- **Cocos2d-x 4** (C++17/CMake, source-checkout SDK, DrawNode/Label procedural 2D)
 - **Host agents:** Claude Code (`CLAUDE.md` + `.claude/skills/`) and Codex (`AGENTS.md` + `.agents/skills/`)
 
 ## Repository Structure (git-tracked source)
@@ -20,7 +21,7 @@ Supported engine × host-agent targets (render-time choices over one source tree
 | Path | Purpose |
 |------|---------|
 | `prompts/runtime.md` | Engine-agnostic runtime manifest — the doc that becomes `CLAUDE.md`/`AGENTS.md` in a published repo. Fixes only *where durable state lives* (`README.md`) and *that results are proven from the running game*. |
-| `engines/godot.md`, `engines/bevy.md`, `engines/babylon.md` | Per-engine guides: stack, project sketch, capture recipe, and silent-failure traps. Copied literally (no token substitution). |
+| `engines/godot.md`, `engines/bevy.md`, `engines/babylon.md`, `engines/cocos2dx.md` | Per-engine guides: stack, project sketch, capture recipe, and silent-failure traps. Copied literally (no token substitution). |
 | `asset-gen/` | The sole published skill: `SKILL.md` (frontmatter + usage), `rembg.md` (background removal), `tools/` (Python CLI: `asset_gen.py`, `tripo3d.py`, `grid_slice.py`, `find_loop_frame.py`, `rembg_matting.py`, `requirements.txt`). |
 | `scripts/render_dir.py` | Renders `${KEY}=value` token substitution over every text file in a directory tree. |
 | `scripts/generate_codex_metadata.py` | Generates Codex `agents/openai.yaml` from `asset-gen`'s `SKILL.md` frontmatter. |
@@ -40,7 +41,7 @@ Supported engine × host-agent targets (render-time choices over one source tree
 ## How Publishing Works
 
 ```bash
-./publish.sh --engine godot|bevy|babylon --agent claude|codex --out <dir> [--force]
+./publish.sh --engine godot|bevy|babylon|cocos2dx --agent claude|codex --out <dir> [--force]
 ```
 
 Flow (see `publish.sh`):

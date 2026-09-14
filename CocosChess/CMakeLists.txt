@@ -22,6 +22,7 @@ add_subdirectory(${COCOS2DX_ROOT_PATH}/cocos ${ENGINE_BINARY_PATH}/cocos/core)
 set(GAME_SOURCE
     Classes/AppDelegate.cpp
     Classes/GameScene.cpp
+    Classes/NetPlayer.cpp
     Classes/main.cpp
 )
 set(GAME_HEADER
@@ -29,6 +30,7 @@ set(GAME_HEADER
     Classes/ChessRules.h
     Classes/AIPlayer.h
     Classes/GameScene.h
+    Classes/NetPlayer.h
     Classes/main.h
 )
 set(GAME_RES_FOLDER "${CMAKE_CURRENT_SOURCE_DIR}/Resources")
