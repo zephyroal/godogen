@@ -12,6 +12,7 @@ Godot 4.7.1 (.NET/C#) 停车游戏：真实刚体车辆物理（`VehicleBody3D` 
 build_scene.bat   # dotnet build + headless 导入 + 生成 scenes/Main.tscn（首次或场景变更后）
 run_game.bat      # 编译并启动游戏
 run_demo.bat      # 第 1 关自动驾驶演示（无需输入注入的端到端验证）
+record_demo.bat   # 录制证明视频 → screenshots/movie/parking_demo.mp4
 ```
 
 或直接：`"Godot_4.7.1_mono_console.exe" --path <本目录> [-- --demo | --verify-report | --verify-hazards] [-- --level=N]`
@@ -119,6 +120,15 @@ run_demo.bat      # 第 1 关自动驾驶演示（无需输入注入的端到端
   小怪确实在移动、截图 `verify_lv{N}.png`；L2 额外断言行人被停着的车阻挡在 ~1.3m 外
   等待（零接触）、重叠传送后 kinematic/static 两类碰撞都正确计数。
   日志 `verify_hazards.txt`，exit 0。
+
+## 证明视频（record_demo.bat）
+
+`--write-movie` + `--fixed-fps 30` 以确定性帧率录制 demo 自动泊车全程
+（PNG 序列，demo 结束自动停机），再用 ffmpeg 合成
+`screenshots/movie/parking_demo.mp4`（libx264 / yuv420p / faststart）。约 23 秒：
+起步 → 满舵 S 弧甩入 → 回拉一把方向 → 倒进库位 → 「√ 停车入位成功！」结算
+（19.9s · 碰撞 0 · 角度 5.2° · 横向 8cm）。电影模式下 demo 依旧走同一套
+`ReportParked` 判定链路，遥测与实时运行逐帧一致（19.88s / 0 碰撞 / 5.2° / -0.08m）。
 
 ## 工程结构
 

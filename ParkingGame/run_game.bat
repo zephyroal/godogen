@@ -1,6 +1,7 @@
 @echo off
-chcp 65001 >nul
+REM Builds and runs ParkingGame in a window.
+setlocal
 cd /d D:\godogen\ParkingGame
 dotnet build --nologo -v q
-if %errorlevel% neq 0 ( echo 编译失败 & exit /b 1 )
+if errorlevel 1 ( echo build failed & exit /b 1 )
 "D:\godogen\Godot_v4.7.1-stable_mono_win64\Godot_v4.7.1-stable_mono_win64_console.exe" --path D:\godogen\ParkingGame
