@@ -12,7 +12,8 @@ env = SConscript("D:/godogen/godot-cpp/SConstruct")
 env.Append(CPPPATH=["src/"])
 
 # the sources carry UTF-8 Chinese UI strings; MSVC needs the switch explicitly
-if "cl" in str(env.get("CC", "")):
+# (the "cl" name test is unreliable — SCons may hold a different CC variable)
+if "MSVC" in env["TOOLS"]:
     env.Append(CCFLAGS=["/utf-8"])
 
 sources = Glob("src/*.cpp")

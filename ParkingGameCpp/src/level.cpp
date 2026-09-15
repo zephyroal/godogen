@@ -149,8 +149,8 @@ void CppLevel::add_parked_car(const Vector3 &pos, float yaw_deg, const Color &co
     glass.instantiate();
     glass->set_albedo(Color(0.10f, 0.13f, 0.16f, 0.85f));
     glass->set_transparency(BaseMaterial3D::TRANSPARENCY_ALPHA);
-    glass->set_roughness(0.08f);
-    glass->set_metallic(0.9f);
+    glass->set_roughness(0.15f);
+    glass->set_metallic(0.45f);
 
     auto mesh = [&](const Vector3 &size, const Ref<StandardMaterial3D> &mat,
                     const Vector3 &mpos) {
