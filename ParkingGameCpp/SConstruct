@@ -1,0 +1,25 @@
+#!/usr/bin/env python
+# Builds the ParkingGameCpp GDExtension against the locally built godot-cpp
+# (which itself targets the exact Godot 4.7.1 API — see build_godot_cpp notes
+# in README.md). Invoke from the project root:
+#   python -m SCons platform=windows target=template_debug arch=x86_64
+#        custom_api_file=D:/godogen/godot_api471/extension_api.json -j10
+
+import os
+
+env = SConscript("D:/godogen/godot-cpp/SConstruct")
+
+env.Append(CPPPATH=["src/"])
+
+# the sources carry UTF-8 Chinese UI strings; MSVC needs the switch explicitly
+if "cl" in str(env.get("CC", "")):
+    env.Append(CCFLAGS=["/utf-8"])
+
+sources = Glob("src/*.cpp")
+
+library = env.SharedLibrary(
+    "bin/libparking_game_cpp.{}.{}.{}{}".format(
+        env["platform"], env["target"], env["arch"], env["SHLIBSUFFIX"]),
+    source=sources)
+
+Default(library)

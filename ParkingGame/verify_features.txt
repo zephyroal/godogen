@@ -7,5 +7,5 @@ editor round-trip save/load ok
 custom-level playable hazards=1 ok
 suv-rule sedan-rejects ok
 suv garage buy/select bought=True coins=200 ok
-suv-rule suv-accepts fanfare=normal BAD
-RESULT FEATURES_TEST FAIL
+suv-rule suv-accepts vehicle=Suv success=True areaFrac=0.96 fanfare=suv ok
+RESULT FEATURES_TEST PASS

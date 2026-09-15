@@ -391,7 +391,8 @@ public partial class Car : VehicleBody3D
         }
     }
 
-    /// <summary>Four chassis corners in world space, used by the slot check.</summary>
+    /// <summary>Four chassis corners in world space, as a proper cyclic ring
+    /// (used both by the corner-in-slot check and by the polygon-area clip).</summary>
     public Vector3[] Corners()
     {
         var b = GlobalTransform.Basis;
@@ -400,7 +401,7 @@ public partial class Car : VehicleBody3D
         Vector3 hf = b.Z * (BodyLen / 2f);
         return new[]
         {
-            o + hw + hf, o + hw - hf, o - hw + hf, o - hw - hf,
+            o + hw + hf, o + hw - hf, o - hw - hf, o - hw + hf,
         };
     }
 }

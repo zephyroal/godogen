@@ -1047,10 +1047,10 @@ public partial class Game : Node3D
                     LoadLevel(0); // clears _success so ReportParked is live again
                     Garage.ResetTo(1000, "classic");
                     _car.SetVehicle(Car.VehicleKind.Sedan);
-                    // yaw -13°: still inside the 15° angle rule, but the sedan's
-                    // corners poke out of the 2.5 m strip while the SUV's area
-                    // fraction stays ≈94% — only the SUV rule accepts this
-                    _car.ResetTo(new Vector3(6.5f, 0.8f, -2.6f), -13f);
+                    // yaw -103° = parked along the slot (yaw -90) tilted 13°:
+                    // inside the 15° angle rule, sedan corners poke out of the
+                    // 2.5 m strip while the SUV's area fraction stays ≈93%
+                    _car.ResetTo(new Vector3(6.5f, 0.8f, -2.6f), -103f);
                     _car.BrakeInput = 1f;
                     Next();
                 }
@@ -1065,7 +1065,7 @@ public partial class Game : Node3D
                     LogFt($"suv garage buy/select bought={bought} coins={Garage.Coins}",
                         bought && sel && Garage.Coins == 200);
                     _car.SetVehicle(Car.VehicleKind.Suv);
-                    _car.ResetTo(new Vector3(6.5f, 0.8f, -2.6f), -13f);
+                    _car.ResetTo(new Vector3(6.5f, 0.8f, -2.6f), -103f);
                     _car.BrakeInput = 1f;
                     Next();
                 }
@@ -1074,7 +1074,9 @@ public partial class Game : Node3D
                 if (_ftTimer > 2.2f) // let the fail-report cooldown lapse
                 {
                     var rs2 = ReportParked();
-                    LogFt($"suv-rule suv-accepts fanfare={LastFanfare}",
+                    var (_, _, areaFrac) = SlotGeometry();
+                    LogFt($"suv-rule suv-accepts vehicle={_car.Vehicle} success={(rs2?.Success == true)} " +
+                        $"areaFrac={areaFrac:0.00} fanfare={LastFanfare}",
                         rs2 is { Success: true } && LastFanfare == "suv");
                     _pendingShot = "verify_suv.png";
                     Next();

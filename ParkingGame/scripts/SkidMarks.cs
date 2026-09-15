@@ -50,8 +50,9 @@ public partial class SkidMarks : Node3D
         float yaw = car.Rotation.Y;
         foreach (var side in new[] { -0.8f, 0.8f })
         {
-            // y 0.064: above the road paint (0.034-0.054) to avoid z-fighting
-            Vector3 p = car.GlobalTransform * new Vector3(side, 0.064f, 1.48f);
+            // y 0.075: clearly above the road paint (0.034-0.054) — a tiny gap
+            // z-fights at 15 m viewing distance on a 720p depth buffer
+            Vector3 p = car.GlobalTransform * new Vector3(side, 0.075f, 1.48f);
             var m = _marks[_next];
             _life[_next] = Ttl;
             _next = (_next + 1) % Pool;
