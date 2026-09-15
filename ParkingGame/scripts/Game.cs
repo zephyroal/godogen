@@ -14,6 +14,17 @@ public partial class Game : Node3D
     private Level _level = null!;
     private Camera3D _cam = null!;
     private HUD _hud = null!;
+    private Environment _env = null!;
+    private DirectionalLight3D _sun = null!;
+    private ProceduralSkyMaterial _skyMat = null!;
+    private WeatherFx _weather = null!;
+    private Effects _fx = null!;
+    private SkidMarks _skids = null!;
+    private GarageUI _garage = null!;
+    private Editor _editor = null!;
+    private LevelDef _customDef = null!;
+    private float _shake;
+    private float _explodeCd;
 
     private int _levelIndex;
     private bool _started;
@@ -50,6 +61,17 @@ public partial class Game : Node3D
     private Vector3[] _hvPosA = System.Array.Empty<Vector3>();
     private string _hazardLogPath = "";
 
+    // ---- --verify-features: weather shots + explosion/skid/garage/editor
+    // assertions for the enhancement batch ----
+    private bool _featuresTest;
+    private int _ftStage;
+    private float _ftTimer;
+    private bool _ftPass = true;
+    private int _ftCoins0;
+    private string _ftCustomBackup = null!;
+    private string _featuresLogPath = "";
+    private bool _editorArg;
+
     public override void _Ready()
     {
         BuildEnvironment();
@@ -60,12 +82,28 @@ public partial class Game : Node3D
         _car = new Car { Name = "PlayerCar" };
         AddChild(_car);
 
+        // weather / effects / skids / garage subsystems
+        _weather = new WeatherFx();
+        _weather.Bind(_env, _sun, _skyMat, _car);
+        AddChild(_weather);
+        _fx = new Effects();
+        AddChild(_fx);
+        _skids = new SkidMarks();
+        AddChild(_skids);
+        _garage = new GarageUI(_car);
+        AddChild(_garage);
+        _car.ApplySkin(Garage.SelectedPaint);
+        var customDto = Editor.LoadCustomDto();
+        _customDef = customDto != null ? Editor.DtoToDef(customDto) : null;
+
         var args = OS.GetCmdlineUserArgs(); // args after "--" — GetCmdlineArgs() only holds engine flags
         foreach (var a in args)
         {
             if (a == "--demo") _demo = true;
             if (a == "--verify-report") _reportTest = true;
             if (a == "--verify-hazards") _hazardTest = true;
+            if (a == "--verify-features") _featuresTest = true;
+            if (a == "--editor") _editorArg = true;
             if (a.StartsWith("--level") && a.Contains('='))
             {
                 if (int.TryParse(a.Split('=')[1], out int lv))
@@ -74,8 +112,8 @@ public partial class Game : Node3D
         }
 
         LoadLevel(_levelIndex);
-        _hud.ShowStart(!_demo && !_reportTest && !_hazardTest);
-        _started = _demo || _reportTest || _hazardTest;
+        _hud.ShowStart(!_demo && !_reportTest && !_hazardTest && !_featuresTest);
+        _started = _demo || _reportTest || _hazardTest || _featuresTest;
         if (_demo)
         {
             _demoLogPath = ProjectSettings.GlobalizePath("res://demo_state.txt");
@@ -91,20 +129,26 @@ public partial class Game : Node3D
             _hazardLogPath = ProjectSettings.GlobalizePath("res://verify_hazards.txt");
             File.WriteAllText(_hazardLogPath, "hazard test\n");
         }
+        if (_featuresTest)
+        {
+            _featuresLogPath = ProjectSettings.GlobalizePath("res://verify_features.txt");
+            File.WriteAllText(_featuresLogPath, "features test\n");
+        }
+        if (_editorArg) OpenEditor();
     }
 
     private void BuildEnvironment()
     {
-        var sky = new ProceduralSkyMaterial
+        _skyMat = new ProceduralSkyMaterial
         {
             SkyTopColor = new Color(0.32f, 0.48f, 0.72f),
             SkyHorizonColor = new Color(0.78f, 0.82f, 0.88f),
             GroundBottomColor = new Color(0.28f, 0.27f, 0.24f),
         };
-        var env = new Environment
+        _env = new Environment
         {
             BackgroundMode = Environment.BGMode.Sky,
-            Sky = new Sky { SkyMaterial = sky },
+            Sky = new Sky { SkyMaterial = _skyMat },
             AmbientLightSource = Environment.AmbientSource.Sky,
             AmbientLightEnergy = 0.65f,
             TonemapMode = Environment.ToneMapper.Filmic,
@@ -112,12 +156,12 @@ public partial class Game : Node3D
             // headlights and the emissive slot markings
             SsaoEnabled = true,
             GlowEnabled = true,
-            GlowIntensity = 0.4f,
-            GlowHdrThreshold = 1.05f,
+            GlowIntensity = 0.65f,
+            GlowHdrThreshold = 0.95f,
         };
-        AddChild(new WorldEnvironment { Environment = env });
+        AddChild(new WorldEnvironment { Environment = _env });
 
-        var sun = new DirectionalLight3D
+        _sun = new DirectionalLight3D
         {
             ShadowEnabled = true,
             LightEnergy = 1.35f,
@@ -125,8 +169,8 @@ public partial class Game : Node3D
             DirectionalShadowMaxDistance = 70f,
             ShadowBlur = 1.5f,
         };
-        sun.RotationDegrees = new Vector3(-62f, 35f, 0f);
-        AddChild(sun);
+        _sun.RotationDegrees = new Vector3(-62f, 35f, 0f);
+        AddChild(_sun);
 
         // edge smoothing for the procedural boxes (cars, walls, cones):
         // MSAA 8x for geometry + FXAA to soften the high-contrast painted lines
@@ -143,9 +187,22 @@ public partial class Game : Node3D
 
     private void LoadLevel(int index)
     {
-        _levelIndex = index;
-        var def = LevelDef.All[index];
+        if (index >= LevelDef.All.Length)
+        {
+            if (_customDef == null) index = 0;
+            else
+            {
+                _levelIndex = index;
+                LoadLevelDef(_customDef);
+                return;
+            }
+        }
+        _levelIndex = Mathf.Clamp(index, 0, LevelDef.All.Length - 1);
+        LoadLevelDef(LevelDef.All[_levelIndex]);
+    }
 
+    private void LoadLevelDef(LevelDef def)
+    {
         if (_level != null)
         {
             RemoveChild(_level);
@@ -155,6 +212,7 @@ public partial class Game : Node3D
         AddChild(_level);
 
         _car.ResetTo(def.Spawn, def.SpawnYawDeg);
+        _weather.Apply(def.Weather);
         _hud.SetPrompt(def.Title, def.Hint);
         _hud.SetGear(Car.Gear.N);
         _hud.ShowEnd(false);
@@ -172,11 +230,49 @@ public partial class Game : Node3D
         _cam.LookAt(p, Vector3.Up);
     }
 
+    // ═══════════════ editor hooks ═══════════════
+
+    /// <summary>Rebuild the level from the editor's draft (resets the car too).</summary>
+    public void EditorPreview(LevelDef def) => LoadLevelDef(def);
+
+    public void SetCustomDef(LevelDef def) => _customDef = def;
+
+    public void BeginEditorTest() => _started = true;
+
+    public void EndEditorTest() => _started = false;
+
+    public void CloseEditor()
+    {
+        if (_editor == null) return;
+        _editor.QueueFree();
+        _editor = null!;
+        LoadLevel(0);
+        _hud.ShowStart(true);
+    }
+
+    private void OpenEditor()
+    {
+        _hud.ShowStart(false);
+        _editor = new Editor();
+        AddChild(_editor);
+        _editor.Setup(this);
+    }
+
+    private void ToggleGarage()
+    {
+        if (_garage.IsOpen) _garage.Close();
+        else _garage.Open();
+    }
+
     // ═══════════════ input ═══════════════
 
     public override void _Input(InputEvent ev)
     {
         if (ev is not InputEventKey k || !k.Pressed || k.Echo)
+            return;
+
+        // the editor owns the keyboard and mouse while its palette is up
+        if (_editor != null && _editor.Active)
             return;
 
         if (k.Keycode == Key.P)
@@ -192,6 +288,23 @@ public partial class Game : Node3D
                 _hud.ShowStart(false);
                 _started = true;
                 LoadLevel(0);
+            }
+            if (k.Keycode == Key.E)
+            {
+                OpenEditor();
+                return;
+            }
+            if (k.Keycode == Key.B)
+            {
+                ToggleGarage();
+                return;
+            }
+            if (k.Keycode == Key.Key0 && _customDef != null)
+            {
+                _hud.ShowStart(false);
+                _started = true;
+                LoadLevel(LevelDef.All.Length);
+                return;
             }
             for (int i = 0; i < LevelDef.All.Length; i++)
             {
@@ -212,6 +325,8 @@ public partial class Game : Node3D
                 LoadLevel((_levelIndex + 1) % LevelDef.All.Length);
             else if (k.Keycode == Key.Backspace)
                 LoadLevel(_levelIndex);
+            else if (k.Keycode == Key.B)
+                ToggleGarage();
             return;
         }
 
@@ -698,6 +813,17 @@ public partial class Game : Node3D
         if (!_started) return;
         _reportCooldown = Mathf.Max(0f, _reportCooldown - dt);
 
+        // live feedback in every mode: brake lights, skid marks, collisions explode
+        _car.SetBrakeLights(_car.BrakeInput > 0.5f || _car.Handbrake);
+        _skids.Tick(_car);
+        _explodeCd = Mathf.Max(0f, _explodeCd - dt);
+        if (_car.CollisionThisTick && _explodeCd <= 0f)
+        {
+            _explodeCd = 0.5f;
+            _fx.Explode(_car.GlobalPosition);
+            _shake = 1f;
+        }
+
         if (_reportTest)
         {
             RunReportTest(dt);
@@ -707,6 +833,12 @@ public partial class Game : Node3D
         if (_hazardTest)
         {
             RunHazardTest(dt);
+            return;
+        }
+
+        if (_featuresTest)
+        {
+            RunFeaturesTest(dt);
             return;
         }
 
@@ -743,6 +875,10 @@ public partial class Game : Node3D
 
     public override void _Process(double delta)
     {
+        // the editor drives the camera itself while its palette is up
+        if (_editor != null && _editor.Active)
+            return;
+
         // top-down follow camera (fixed north-up)
         var def = _level.Def;
         var p = _car.GlobalPosition;
@@ -750,6 +886,14 @@ public partial class Game : Node3D
         float k = Mathf.Clamp((float)delta * 5f, 0f, 1f);
         _cam.GlobalPosition = _cam.GlobalPosition.Lerp(desired, k);
         _cam.LookAt(p + new Vector3(0, 0.2f, 0), Vector3.Up);
+
+        // collision shake, decaying fast
+        if (_shake > 0.01f)
+        {
+            _cam.GlobalPosition += new Vector3(GD.Randf() - 0.5f, 0, GD.Randf() - 0.5f)
+                * (_shake * 0.25f);
+            _shake *= Mathf.Exp(-5f * (float)delta);
+        }
 
         float kmh = Mathf.Abs(_car.ForwardSpeed) * 3.6f;
         _hud.SetSpeed(kmh, Mathf.RadToDeg(_car.Steering));
