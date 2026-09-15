@@ -14,7 +14,7 @@ public partial class Effects : Node3D
     {
         BurstCount++;
 
-        var p = new CPUParticles3D
+        var p = new CpuParticles3D
         {
             Position = at + Vector3.Up * 0.7f,
             Emitting = true,

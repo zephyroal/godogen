@@ -13,14 +13,23 @@ public partial class Car : VehicleBody3D
     public enum Gear { N, D, R }
     public Gear CurrentGear = Gear.N;
 
+    /// <summary>Sedan (default) or the special SUV. The SUV is larger and gets
+    /// the relaxed 70%-area-in-slot verdict rule + its own success fanfare.</summary>
+    public enum VehicleKind { Sedan, Suv }
+    public VehicleKind Vehicle { get; private set; } = VehicleKind.Sedan;
+
+    // sedan geometry stays a shared constant — parked cars and patrol cars use it
+    public const float SedanLen = 4.6f;
+    public const float SedanWid = 1.8f;
+    // the player's actual body follows the selected vehicle kind
+    public float BodyLen = SedanLen;
+    public float BodyWid = SedanWid;
+
     // ---- control inputs (0..1 / -1..1), written externally each tick ----
     public float Throttle;    // 0..1
     public float BrakeInput;  // 0..1
     public float SteerInput;  // -1..1, +1 = wheels left (Godot steering convention)
     public bool Handbrake;
-
-    public const float BodyLen = 4.6f;
-    public const float BodyWid = 1.8f;
 
     // ---- tuning ----
     public float MaxEngineForce = 3400f;   // N total at driven wheels (forward)
@@ -42,6 +51,9 @@ public partial class Car : VehicleBody3D
     private readonly System.Collections.Generic.HashSet<Node> _recentHits = new();
     private StandardMaterial3D _paintMat = null!;  // body+roof paint — swapped by the garage
     private StandardMaterial3D _tailMat = null!;   // taillights — brighten while braking
+    private BoxShape3D _chassisShape = null!;
+    private Node3D _shell = null!;                 // procedural body, rebuilt per vehicle kind
+    private Color _skin = new(0.82f, 0.27f, 0.24f);
 
     public int CollisionCount { get; private set; }
     public bool CollisionThisTick { get; private set; }
@@ -51,13 +63,13 @@ public partial class Car : VehicleBody3D
         Mass = 1200f;
         CanSleep = false;
 
-        // chassis collision
-        var shape = new CollisionShape3D
+        // chassis collision (resized by SetVehicle)
+        _chassisShape = new BoxShape3D { Size = new Vector3(BodyWid, 1.05f, BodyLen) };
+        AddChild(new CollisionShape3D
         {
-            Shape = new BoxShape3D { Size = new Vector3(BodyWid, 1.05f, BodyLen) },
+            Shape = _chassisShape,
             Position = new Vector3(0, 0.55f, 0),
-        };
-        AddChild(shape);
+        });
 
         // ---- wheels: front steer, rear drive (classic RWD parking feel) ----
         _fl = MakeWheel(new Vector3(-0.80f, 0.10f, -1.48f), steering: true);
@@ -83,6 +95,22 @@ public partial class Car : VehicleBody3D
         AddChild(hitbox);
     }
 
+    /// <summary>Swap vehicle kind: resizes the collision box and rebuilds the
+    /// procedural shell (SUV is longer, wider, taller, with roof rails).</summary>
+    public void SetVehicle(VehicleKind kind)
+    {
+        Vehicle = kind;
+        BodyLen = kind == VehicleKind.Suv ? 4.9f : SedanLen;
+        BodyWid = kind == VehicleKind.Suv ? 1.95f : SedanWid;
+        _chassisShape.Size = new Vector3(BodyWid, 1.05f, BodyLen);
+        if (_shell != null && IsInstanceValid(_shell))
+        {
+            RemoveChild(_shell);
+            _shell.QueueFree();
+        }
+        BuildVisuals();
+    }
+
     private VehicleWheel3D MakeWheel(Vector3 pos, bool steering, bool traction = false)
     {
         var w = new VehicleWheel3D
@@ -106,9 +134,13 @@ public partial class Car : VehicleBody3D
 
     private void BuildVisuals()
     {
+        bool suv = Vehicle == VehicleKind.Suv;
+        _shell = new Node3D { Name = "Shell" };
+        AddChild(_shell);
+
         var red = new StandardMaterial3D
         {
-            AlbedoColor = new Color(0.82f, 0.27f, 0.24f),
+            AlbedoColor = _skin,
             Roughness = 0.32f,
             Metallic = 0.12f, // paint with a hint of clearcoat for the sun to read
         };
@@ -139,53 +171,67 @@ public partial class Car : VehicleBody3D
         };
         _tailMat = taillight;
 
-        var body = new MeshInstance3D
+        // ---- body: boxier and taller when the SUV kind is selected ----
+        float chassisH = suv ? 0.68f : 0.55f;
+        float chassisY = suv ? 0.56f : 0.52f;
+        _shell.AddChild(new MeshInstance3D
         {
-            Mesh = new BoxMesh { Size = new Vector3(BodyWid, 0.55f, BodyLen) },
+            Mesh = new BoxMesh { Size = new Vector3(BodyWid, chassisH, BodyLen) },
             MaterialOverride = red,
-            Position = new Vector3(0, 0.52f, 0),
-        };
-        AddChild(body);
-
-        // cabin: dark glass band wrapped by a painted roof
-        var windows = new MeshInstance3D
+            Position = new Vector3(0, chassisY, 0),
+        });
+        _shell.AddChild(new MeshInstance3D
         {
-            Mesh = new BoxMesh { Size = new Vector3(BodyWid - 0.14f, 0.30f, 2.16f) },
+            Mesh = new BoxMesh { Size = new Vector3(BodyWid - 0.14f, suv ? 0.40f : 0.30f, suv ? 2.35f : 2.16f) },
             MaterialOverride = glass,
-            Position = new Vector3(0, 0.95f, 0.25f),
-        };
-        AddChild(windows);
-        var roof = new MeshInstance3D
+            Position = new Vector3(0, suv ? 1.06f : 0.95f, 0.25f),
+        });
+        _shell.AddChild(new MeshInstance3D
         {
-            Mesh = new BoxMesh { Size = new Vector3(BodyWid - 0.2f, 0.20f, 2.0f) },
+            Mesh = new BoxMesh { Size = new Vector3(BodyWid - 0.2f, 0.20f, suv ? 2.2f : 2.0f) },
             MaterialOverride = red,
-            Position = new Vector3(0, 1.20f, 0.22f),
-        };
-        AddChild(roof);
+            Position = new Vector3(0, suv ? 1.36f : 1.20f, 0.22f),
+        });
+        if (suv)
+        {
+            // roof rails — the giveaway SUV silhouette from top-down
+            foreach (var x in new[] { -(BodyWid / 2f - 0.22f), BodyWid / 2f - 0.22f })
+            {
+                _shell.AddChild(new MeshInstance3D
+                {
+                    Mesh = new BoxMesh { Size = new Vector3(0.07f, 0.06f, 2.0f) },
+                    MaterialOverride = dark,
+                    Position = new Vector3(x, 1.49f, 0.22f),
+                });
+            }
+        }
 
         // bumpers + lights (front = -Z)
         foreach (var z in new[] { -BodyLen / 2f - 0.03f, BodyLen / 2f + 0.03f })
         {
-            AddChild(new MeshInstance3D
+            _shell.AddChild(new MeshInstance3D
             {
-                Mesh = new BoxMesh { Size = new Vector3(BodyWid + 0.06f, 0.30f, 0.12f) },
+                Mesh = new BoxMesh { Size = new Vector3(BodyWid + 0.06f, suv ? 0.36f : 0.30f, 0.12f) },
                 MaterialOverride = dark,
-                Position = new Vector3(0, 0.38f, z),
+                Position = new Vector3(0, suv ? 0.42f : 0.38f, z),
             });
         }
         foreach (var x in new[] { -0.55f, 0.55f })
         {
-            AddChild(new MeshInstance3D
+            float lx = suv ? x * 1.18f : x;
+            float ly = suv ? 0.60f : 0.55f;
+            _shell.AddChild(new MeshInstance3D
             {
                 Mesh = new BoxMesh { Size = new Vector3(0.30f, 0.12f, 0.06f) },
                 MaterialOverride = headlight,
-                Position = new Vector3(x, 0.55f, -BodyLen / 2f - 0.02f),
+                Position = new Vector3(lx, ly, -BodyLen / 2f - 0.02f),
             });
-            AddChild(new MeshInstance3D
+            _shell.AddChild(new MeshInstance3D
             {
-                Mesh = new BoxMesh { Size = new Vector3(0.30f, 0.12f, 0.06f) },
+                // chunky enough to read as glowing brake lights from top-down
+                Mesh = new BoxMesh { Size = new Vector3(0.34f, 0.18f, 0.10f) },
                 MaterialOverride = taillight,
-                Position = new Vector3(x, 0.55f, BodyLen / 2f + 0.02f),
+                Position = new Vector3(lx, ly, BodyLen / 2f + 0.04f),
             });
         }
 
@@ -207,7 +253,7 @@ public partial class Car : VehicleBody3D
                 Rotation = new Vector3(0, 0, Mathf.Pi / 2f),
                 Position = new Vector3(Mathf.Sign(x) * 0.13f, 0, 0),
             });
-            AddChild(pivot);
+            _shell.AddChild(pivot);
             if (z < 0)
             {
                 if (x < 0) _flPivot = pivot; else _frPivot = pivot;
@@ -218,10 +264,14 @@ public partial class Car : VehicleBody3D
     public void SelectGear(Gear g) => CurrentGear = g;
 
     /// <summary>Garage repaint: body + roof share the paint material.</summary>
-    public void ApplySkin(Color paint) => _paintMat.AlbedoColor = paint;
+    public void ApplySkin(Color paint)
+    {
+        _skin = paint;
+        _paintMat.AlbedoColor = paint;
+    }
 
     /// <summary>Brake lights: taillights glow much brighter while braking or on the handbrake.</summary>
-    public void SetBrakeLights(bool on) => _tailMat.EmissionEnergyMultiplier = on ? 3.2f : 1.4f;
+    public void SetBrakeLights(bool on) => _tailMat.EmissionEnergyMultiplier = on ? 4.5f : 1.6f;
 
     /// <summary>Weather grip: scales every wheel's friction slip (snow ≈ 0.55, rain ≈ 0.78).</summary>
     public void SetGrip(float scale)

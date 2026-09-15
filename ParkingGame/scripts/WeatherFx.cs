@@ -12,6 +12,7 @@ public partial class WeatherFx : Node3D
     private ProceduralSkyMaterial _sky = null!;
     private Car _car = null!;
     private Node3D _particles = null!;
+    private float _fxHeight = 14f;
 
     public void Bind(Environment env, DirectionalLight3D sun, ProceduralSkyMaterial sky, Car car)
     {
@@ -28,7 +29,7 @@ public partial class WeatherFx : Node3D
         {
             var cam = GetViewport().GetCamera3D();
             if (cam != null)
-                _particles.GlobalPosition = new Vector3(cam.GlobalPosition.X, 14f, cam.GlobalPosition.Z);
+                _particles.GlobalPosition = new Vector3(cam.GlobalPosition.X, _fxHeight, cam.GlobalPosition.Z);
         }
     }
 
@@ -63,8 +64,10 @@ public partial class WeatherFx : Node3D
                 _env.FogDensity = 0.012f;
                 _sun.LightEnergy = 0.6f;
                 _sun.LightColor = new Color(0.85f, 0.88f, 0.95f);
+                _fxHeight = 14f; // rain streaks fall fast (20 m/s) — a thin high band works
                 _particles = MakeParticles(new Color(0.62f, 0.72f, 0.90f, 0.45f),
-                    new Vector3(0.012f, 0.55f, 0.012f), 420, 1.4f, 20f);
+                    new Vector3(0.012f, 0.55f, 0.012f), 420, 1.4f, 20f,
+                    new Vector3(18f, 1f, 14f));
                 _car.SetGrip(0.78f);
                 break;
 
@@ -78,28 +81,32 @@ public partial class WeatherFx : Node3D
                 _env.FogDensity = 0.008f;
                 _sun.LightEnergy = 0.9f;
                 _sun.LightColor = new Color(0.95f, 0.97f, 1f);
-                _particles = MakeParticles(new Color(1f, 1f, 1f, 0.85f),
-                    new Vector3(0.06f, 0.06f, 0.06f), 320, 7f, 1.8f);
+                // spawn band sits LOW and TALL (y 2-14): snow falls slowly, so a
+                // high thin band would hover above the top-down camera frustum
+                _fxHeight = 8f;
+                _particles = MakeParticles(new Color(1f, 1f, 1f, 0.9f),
+                    new Vector3(0.11f, 0.11f, 0.11f), 700, 5f, 1.5f,
+                    new Vector3(9f, 6f, 7f));
                 _car.SetGrip(0.55f);
                 break;
 
             case WeatherKind.Blaze:
-                _sky.SkyTopColor = new Color(0.25f, 0.45f, 0.80f);
-                _sky.SkyHorizonColor = new Color(0.95f, 0.85f, 0.68f);
-                _env.AmbientLightEnergy = 0.55f;
+                _sky.SkyTopColor = new Color(0.22f, 0.42f, 0.78f);
+                _sky.SkyHorizonColor = new Color(1.0f, 0.78f, 0.5f);
+                _env.AmbientLightEnergy = 0.45f;
                 _env.GlowIntensity = 0.85f;
                 _env.FogEnabled = false;
-                _sun.LightEnergy = 1.9f;
-                _sun.LightColor = new Color(1f, 0.90f, 0.72f);
+                _sun.LightEnergy = 2.6f;
+                _sun.LightColor = new Color(1f, 0.88f, 0.68f);
                 _car.SetGrip(1f);
                 break;
         }
     }
 
-    private CPUParticles3D MakeParticles(Color color, Vector3 meshSize, int amount,
-        float lifetime, float velocity)
+    private CpuParticles3D MakeParticles(Color color, Vector3 meshSize, int amount,
+        float lifetime, float velocity, Vector3 boxExtents)
     {
-        var p = new CPUParticles3D
+        var p = new CpuParticles3D
         {
             Amount = amount,
             Lifetime = lifetime,
@@ -116,8 +123,8 @@ public partial class WeatherFx : Node3D
             InitialVelocityMin = velocity * 0.85f,
             InitialVelocityMax = velocity * 1.15f,
             Gravity = Vector3.Zero,
-            EmissionShape = CPUParticles3D.EmissionShapeEnum.Box,
-            EmissionBoxExtents = new Vector3(18f, 1f, 14f),
+            EmissionShape = CpuParticles3D.EmissionShapeEnum.Box,
+            EmissionBoxExtents = boxExtents,
         };
         AddChild(p);
         return p;

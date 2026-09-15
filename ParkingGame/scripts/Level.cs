@@ -25,6 +25,7 @@ public class LevelDef
     public float SlotWid = 2.5f;
     public float AngleTolDeg = 15f;
     public WeatherKind Weather = WeatherKind.Sunny;
+    public bool RoadMarkings = true; // dashed lane/arrow/zebra paint (off in the alley level)
     public float CamH = 15f, CamBack = 7f;
     public List<BoxDef> Walls { get; } = new();
     public List<ParkedDef> Parked { get; } = new();
@@ -98,6 +99,7 @@ public class LevelDef
         Title = "第 3 关 · 直角巷道",
         Hint = "先直线倒出巷道口，再摆尾进左侧车位——巷道里也有行人走动",
         Spawn = new Vector3(12f, 0.8f, 15.5f), SpawnYawDeg = 180f,
+        RoadMarkings = false,
         SlotCenter = new Vector3(5.5f, 0, -3.0f), SlotLen = 6.0f, SlotWid = 2.5f,
         CamH = 17f, CamBack = 8f,
         Walls =
@@ -325,6 +327,8 @@ public partial class Level : Node3D
         level.AddStaticBox(new BoxDef(new Vector3(0, -0.5f, 0), new Vector3(90, 1, 90)),
             new Color(0.24f, 0.25f, 0.27f), "Floor");
         level.PaintSlot(def);
+        if (def.RoadMarkings)
+            level.PaintRoad(def);
         foreach (var w in def.Walls)
             level.AddStaticBox(w, new Color(0.72f, 0.72f, 0.70f), "Obstacle");
         foreach (var p in def.Parked)
@@ -408,26 +412,94 @@ public partial class Level : Node3D
         AddChild(pivot);
     }
 
+    private void PaintRoad(LevelDef def)
+    {
+        // generic lot markings derived from the slot position: a dashed yellow
+        // centerline, a west-pointing arrow on the approach lane, and a zebra
+        // crossing on the far side of the road. Pure paint — no colliders, so
+        // hazards' ray probes ignore it. y 0.044 sits above the slot strips and
+        // below the skid marks (0.064) to avoid z-fighting.
+        float laneZ = def.SlotCenter.Z + def.SlotWid / 2f + 2.2f;
+        var yellow = new StandardMaterial3D
+        {
+            AlbedoColor = new Color(0.9f, 0.72f, 0.08f),
+            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+            EmissionEnabled = true,
+            Emission = new Color(0.5f, 0.4f, 0.05f),
+            EmissionEnergyMultiplier = 0.55f,
+        };
+        var white = new StandardMaterial3D
+        {
+            AlbedoColor = new Color(0.92f, 0.92f, 0.90f),
+            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+            EmissionEnabled = true,
+            Emission = new Color(0.72f, 0.72f, 0.66f),
+            EmissionEnergyMultiplier = 0.6f,
+        };
+
+        for (float x = def.SlotCenter.X - 7f; x <= def.SlotCenter.X + 7f; x += 3.4f)
+        {
+            AddChild(new MeshInstance3D
+            {
+                Mesh = new BoxMesh { Size = new Vector3(1.8f, 0.02f, 0.12f) },
+                MaterialOverride = yellow,
+                Position = new Vector3(x, 0.044f, laneZ),
+            });
+        }
+
+        // arrow: shaft + chevron head, pointing west along the approach lane
+        float ax = def.SlotCenter.X + 6f;
+        AddChild(new MeshInstance3D
+        {
+            Mesh = new BoxMesh { Size = new Vector3(1.3f, 0.02f, 0.18f) },
+            MaterialOverride = white,
+            Position = new Vector3(ax, 0.044f, laneZ),
+        });
+        float tipX = ax - 0.85f;
+        foreach (var s in new[] { -1, 1 })
+        {
+            AddChild(new MeshInstance3D
+            {
+                Mesh = new BoxMesh { Size = new Vector3(0.16f, 0.02f, 0.55f) },
+                MaterialOverride = white,
+                Position = new Vector3(tipX + 0.21f, 0.044f, laneZ + s * 0.2f),
+                Rotation = new Vector3(0, -s * 0.7f, 0),
+            });
+        }
+
+        // zebra crossing
+        float zc = def.SlotCenter.Z + def.SlotWid / 2f + 5.3f;
+        for (float x = def.SlotCenter.X - 3.5f; x <= def.SlotCenter.X + 3.5f; x += 0.75f)
+        {
+            AddChild(new MeshInstance3D
+            {
+                Mesh = new BoxMesh { Size = new Vector3(0.45f, 0.02f, 2.2f) },
+                MaterialOverride = white,
+                Position = new Vector3(x, 0.044f, zc),
+            });
+        }
+    }
+
     private void AddParkedCar(ParkedDef p)
     {
         var body = new StaticBody3D { Name = "Obstacle", Position = p.Pos,
             Rotation = new Vector3(0, Mathf.DegToRad(p.YawDeg), 0) };
         body.AddChild(new CollisionShape3D
         {
-            Shape = new BoxShape3D { Size = new Vector3(Car.BodyWid, 1.05f, Car.BodyLen) },
+            Shape = new BoxShape3D { Size = new Vector3(Car.SedanWid, 1.05f, Car.SedanLen) },
             Position = new Vector3(0, 0.55f, 0),
         });
         var paint = new StandardMaterial3D { AlbedoColor = p.Color, Roughness = 0.4f, Metallic = 0.1f };
         var chassis = new MeshInstance3D
         {
-            Mesh = new BoxMesh { Size = new Vector3(Car.BodyWid, 0.55f, Car.BodyLen) },
+            Mesh = new BoxMesh { Size = new Vector3(Car.SedanWid, 0.55f, Car.SedanLen) },
             MaterialOverride = paint,
             Position = new Vector3(0, 0.52f, 0),
         };
         // same glass-band + roof silhouette as the player car (lights off — parked)
         var windows = new MeshInstance3D
         {
-            Mesh = new BoxMesh { Size = new Vector3(Car.BodyWid - 0.14f, 0.30f, 2.16f) },
+            Mesh = new BoxMesh { Size = new Vector3(Car.SedanWid - 0.14f, 0.30f, 2.16f) },
             MaterialOverride = new StandardMaterial3D
             {
                 AlbedoColor = new Color(0.10f, 0.13f, 0.16f, 0.85f),
@@ -439,7 +511,7 @@ public partial class Level : Node3D
         };
         var roof = new MeshInstance3D
         {
-            Mesh = new BoxMesh { Size = new Vector3(Car.BodyWid - 0.2f, 0.20f, 2.0f) },
+            Mesh = new BoxMesh { Size = new Vector3(Car.SedanWid - 0.2f, 0.20f, 2.0f) },
             MaterialOverride = paint,
             Position = new Vector3(0, 1.20f, 0.22f),
         };

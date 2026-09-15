@@ -59,26 +59,31 @@ public partial class Editor : Node3D
         return null!;
     }
 
-    public static LevelDef DtoToDef(CustomDto d) => new()
+    public static LevelDef DtoToDef(CustomDto d)
     {
-        Title = "自定义关卡",
-        Hint = "编辑器制作——停好后按 G 报告判定",
-        Spawn = new Vector3(d.Spawn[0], d.Spawn[1], d.Spawn[2]),
-        SpawnYawDeg = d.SpawnYaw,
-        SlotCenter = new Vector3(d.SlotC[0], d.SlotC[1], d.SlotC[2]),
-        SlotYawDeg = d.SlotYaw,
-        SlotLen = d.SlotLen,
-        SlotWid = d.SlotWid,
-        Weather = System.Enum.TryParse<WeatherKind>(d.Weather, out var w) ? w : WeatherKind.Sunny,
-        CamH = 18f, CamBack = 9f,
-        Walls = { d.Walls.ConvertAll(w => new BoxDef(
-                      new Vector3(w.C[0], w.C[1], w.C[2]), new Vector3(w.S[0], w.S[1], w.S[2]))) },
-        Parked = { d.Parked.ConvertAll(p => new ParkedDef(
-                      new Vector3(p.X, 0, p.Z), p.Yaw, ParkColors[System.Math.Clamp(p.Color, 0, ParkColors.Length - 1)])) },
-        Cones = { d.Cones.ConvertAll(c => new Vector3(c[0], 0, c[1])) },
-        Hazards = { d.Peds.ConvertAll(p => new HazardDef(HazardKind.Pedestrian,
-                      new[] { new Vector3(p.Ax, 0, p.Az), new Vector3(p.Bx, 0, p.Bz) }, 1.1f)) },
-    };
+        var def = new LevelDef
+        {
+            Title = "自定义关卡",
+            Hint = "编辑器制作——停好后按 G 报告判定",
+            Spawn = new Vector3(d.Spawn[0], d.Spawn[1], d.Spawn[2]),
+            SpawnYawDeg = d.SpawnYaw,
+            SlotCenter = new Vector3(d.SlotC[0], d.SlotC[1], d.SlotC[2]),
+            SlotYawDeg = d.SlotYaw,
+            SlotLen = d.SlotLen,
+            SlotWid = d.SlotWid,
+            Weather = System.Enum.TryParse<WeatherKind>(d.Weather, out var w) ? w : WeatherKind.Sunny,
+            CamH = 18f, CamBack = 9f,
+        };
+        def.Walls.AddRange(d.Walls.ConvertAll(wl =>
+            new BoxDef(new Vector3(wl.C[0], wl.C[1], wl.C[2]), new Vector3(wl.S[0], wl.S[1], wl.S[2]))));
+        def.Parked.AddRange(d.Parked.ConvertAll(p =>
+            new ParkedDef(new Vector3(p.X, 0, p.Z), p.Yaw,
+                ParkColors[System.Math.Clamp(p.Color, 0, ParkColors.Length - 1)])));
+        def.Cones.AddRange(d.Cones.ConvertAll(c => new Vector3(c[0], 0, c[1])));
+        def.Hazards.AddRange(d.Peds.ConvertAll(p => new HazardDef(HazardKind.Pedestrian,
+            new[] { new Vector3(p.Ax, 0, p.Az), new Vector3(p.Bx, 0, p.Bz) }, 1.1f)));
+        return def;
+    }
 
     // ---- editor instance ----
     private Game _game = null!;
@@ -138,10 +143,10 @@ public partial class Editor : Node3D
 
     private void SeedTemplate()
     {
-        _walls.Add(new WallDto { C = { 7, 0.175f, -4.6f }, S = { 24, 0.35f, 0.35f } });
-        _walls.Add(new WallDto { C = { 7, 0.5f, 6.6f }, S = { 24, 1, 0.4f } });
-        _walls.Add(new WallDto { C = { -4.5f, 0.5f, 1 }, S = { 0.4f, 1, 11 } });
-        _walls.Add(new WallDto { C = { 18.5f, 0.5f, 1 }, S = { 0.4f, 1, 11 } });
+        _walls.Add(new WallDto { C = new[] { 7f, 0.175f, -4.6f }, S = new[] { 24f, 0.35f, 0.35f } });
+        _walls.Add(new WallDto { C = new[] { 7f, 0.5f, 6.6f }, S = new[] { 24f, 1f, 0.4f } });
+        _walls.Add(new WallDto { C = new[] { -4.5f, 0.5f, 1f }, S = new[] { 0.4f, 1f, 11f } });
+        _walls.Add(new WallDto { C = new[] { 18.5f, 0.5f, 1f }, S = new[] { 0.4f, 1f, 11f } });
     }
 
     private void Import(CustomDto d)
@@ -268,9 +273,9 @@ public partial class Editor : Node3D
 
     private CustomDto DtoFromState() => new()
     {
-        Spawn = { _spawn.X, _spawn.Y, _spawn.Z },
+        Spawn = new[] { _spawn.X, _spawn.Y, _spawn.Z },
         SpawnYaw = _spawnYaw,
-        SlotC = { _slotC.X, _slotC.Y, _slotC.Z },
+        SlotC = new[] { _slotC.X, _slotC.Y, _slotC.Z },
         SlotYaw = _slotYaw,
         SlotLen = _slotLen,
         SlotWid = _slotWid,
@@ -349,8 +354,8 @@ public partial class Editor : Node3D
                 case Key.Key6: SelectTool(Tool.Spawn); break;
                 case Key.Key7: SelectTool(Tool.Delete); break;
                 case Key.R: RotateTool(); break;
-                case Key.BracketLeft: _slotLen = Mathf.Clamp(_slotLen - 0.3f, 4.6f, 8f); Rebuild(); break;
-                case Key.BracketRight: _slotLen = Mathf.Clamp(_slotLen + 0.3f, 4.6f, 8f); Rebuild(); break;
+                case Key.Bracketleft: _slotLen = Mathf.Clamp(_slotLen - 0.3f, 4.6f, 8f); Rebuild(); break;
+                case Key.Bracketright: _slotLen = Mathf.Clamp(_slotLen + 0.3f, 4.6f, 8f); Rebuild(); break;
                 case Key.Minus: _slotWid = Mathf.Clamp(_slotWid - 0.1f, 2.1f, 3.4f); Rebuild(); break;
                 case Key.Equal: _slotWid = Mathf.Clamp(_slotWid + 0.1f, 2.1f, 3.4f); Rebuild(); break;
                 case Key.W: CycleWeather(); break;
@@ -379,7 +384,7 @@ public partial class Editor : Node3D
             case Tool.Wall:
                 _walls.Add(new WallDto
                 {
-                    C = { p.X, 0.5f, p.Z },
+                    C = new[] { p.X, 0.5f, p.Z },
                     S = _wallHorizontal ? new[] { 4f, 1f, 0.4f } : new[] { 0.4f, 1f, 4f },
                 });
                 Rebuild();

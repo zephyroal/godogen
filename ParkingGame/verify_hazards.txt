@@ -14,4 +14,10 @@ LV5 spawn-collisions=0 ok
 LV5 hazards=2 moved=yes
 LV6 spawn-collisions=0 ok
 LV6 hazards=2 moved=yes
+LV7 spawn-collisions=0 ok
+LV7 hazards=1 moved=yes
+LV8 spawn-collisions=0 ok
+LV8 hazards=1 moved=yes
+LV9 spawn-collisions=0 ok
+LV9 hazards=3 moved=yes
 RESULT HAZARD_TEST PASS

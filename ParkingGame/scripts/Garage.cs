@@ -6,10 +6,11 @@ using Godot;
 namespace ParkingGame;
 
 public record SkinDef(string Id, string Name, int Price, Color Paint);
+public record VehicleDef(string Id, string Name, int Price, string Note);
 
-/// <summary>Coins and paint skins, persisted to user://parking_save.json.
-/// Successful parks pay out (perfect costs more); skins are bought once and
-/// kept forever.</summary>
+/// <summary>Coins, paint skins and special vehicles, persisted to
+/// user://parking_save.json. Successful parks pay out; the SUV is a special
+/// vehicle with a relaxed 70%-area-in-slot verdict and its own fanfare.</summary>
 public static class Garage
 {
     public const int PerfectReward = 300;
@@ -25,16 +26,24 @@ public static class Garage
         new("gold", "鎏金", 1000, new Color(1.00f, 0.78f, 0.25f)),
     };
 
+    public static readonly VehicleDef[] Vehicles =
+    {
+        new("sedan", "经典轿车", 0, "标准判定：四角全部入库"),
+        new("suv", "SUV 越野车", 800, "宽容判定：30% 面积在线外仍算成功"),
+    };
+
     // ---- persistence ----
     private sealed class SaveData
     {
         public int Coins { get; set; }
         public List<string> Owned { get; set; } = new();
         public string Selected { get; set; } = "classic";
+        public string Vehicle { get; set; } = "sedan";
     }
 
     private static SaveData _data = Load();
-    private static string SavePath => ProjectSettings.GlobalizePath("user://parking_save.json");
+
+    public static string SavePath => ProjectSettings.GlobalizePath("user://parking_save.json");
 
     private static SaveData Load()
     {
@@ -51,10 +60,12 @@ public static class Garage
 
     // ---- state ----
     public static int Coins => _data.Coins;
-    public static bool Owns(string id) => id == "classic" || _data.Owned.Contains(id);
+    public static bool Owns(string id) => id == "classic" || id == "sedan" || _data.Owned.Contains(id);
     public static string SelectedId => _data.Selected;
+    public static string SelectedVehicleId => _data.Vehicle;
     public static Color SelectedPaint => FindSkin(_data.Selected)?.Paint ?? Skins[0].Paint;
     public static SkinDef FindSkin(string id) => System.Array.Find(Skins, s => s.Id == id);
+    public static VehicleDef FindVehicle(string id) => System.Array.Find(Vehicles, v => v.Id == id);
 
     public static void Award(int coins)
     {
@@ -64,9 +75,9 @@ public static class Garage
 
     public static bool TryBuy(string id)
     {
-        var s = FindSkin(id);
-        if (s == null || Owns(id) || _data.Coins < s.Price) return false;
-        _data.Coins -= s.Price;
+        int price = FindSkin(id)?.Price ?? FindVehicle(id)?.Price ?? -1;
+        if (price < 0 || Owns(id) || _data.Coins < price) return false;
+        _data.Coins -= price;
         _data.Owned.Add(id);
         Save();
         return true;
@@ -74,10 +85,26 @@ public static class Garage
 
     public static bool TrySelect(string id)
     {
-        if (!Owns(id)) return false;
+        if (!Owns(id) || FindSkin(id) == null) return false;
         _data.Selected = id;
         Save();
         return true;
+    }
+
+    public static bool TrySelectVehicle(string id)
+    {
+        if (!Owns(id) || FindVehicle(id) == null) return false;
+        _data.Vehicle = id;
+        Save();
+        return true;
+    }
+
+    /// <summary>Test hook (mirrors Car.ResetTo): pin the wallet to a known
+    /// state so --verify-features is idempotent across runs.</summary>
+    public static void ResetTo(int coins, string selected, string vehicle = "sedan")
+    {
+        _data = new SaveData { Coins = coins, Selected = selected, Vehicle = vehicle };
+        Save();
     }
 }
 
@@ -151,6 +178,40 @@ public partial class GarageUI : CanvasLayer
             c.QueueFree();
 
         _title.Text = $"车库　·　金币 {Garage.Coins}";
+
+        _rows.AddChild(MkLabel("车辆", 22, new Color(1f, 0.88f, 0.6f)));
+        foreach (var v in Garage.Vehicles)
+        {
+            var row = new HBoxContainer();
+            row.AddThemeConstantOverride("separation", 14);
+            row.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter;
+            row.AddChild(MkLabel(v.Name, 22, new Color(0.95f, 0.92f, 0.86f)));
+            row.AddChild(MkLabel(v.Note, 16, new Color(0.75f, 0.72f, 0.66f)));
+
+            Button btn;
+            if (Garage.SelectedVehicleId == v.Id)
+            {
+                btn = MkButton("已装备", false);
+            }
+            else if (Garage.Owns(v.Id))
+            {
+                btn = MkButton("选择", true);
+                btn.Pressed += () => { Garage.TrySelectVehicle(v.Id); Equip(); };
+            }
+            else
+            {
+                bool afford = Garage.Coins >= v.Price;
+                btn = MkButton(afford ? $"购买 {v.Price} 金币" : $"{v.Price} 金币", afford);
+                btn.Pressed += () =>
+                {
+                    if (Garage.TryBuy(v.Id)) { Garage.TrySelectVehicle(v.Id); Equip(); }
+                };
+            }
+            row.AddChild(btn);
+            _rows.AddChild(row);
+        }
+
+        _rows.AddChild(MkLabel("涂装", 22, new Color(1f, 0.88f, 0.6f)));
         foreach (var s in Garage.Skins)
         {
             var row = new HBoxContainer();
@@ -182,6 +243,13 @@ public partial class GarageUI : CanvasLayer
             row.AddChild(btn);
             _rows.AddChild(row);
         }
+    }
+
+    private void Equip()
+    {
+        _car.SetVehicle(Garage.SelectedVehicleId == "suv"
+            ? Car.VehicleKind.Suv : Car.VehicleKind.Sedan);
+        Rebuild();
     }
 
     private void ApplyAndRebuild(SkinDef s)

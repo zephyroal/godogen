@@ -8,7 +8,7 @@ namespace ParkingGame;
 /// (SystemFont), no assets.</summary>
 public partial class HUD : CanvasLayer
 {
-    private Label _prompt, _gear, _gearCap, _speed, _timer, _toast;
+    private Label _prompt, _gear, _gearCap, _speed, _timer, _toast, _coins;
     private Button _report;
     private Control _startOverlay, _endOverlay;
     private Label _endTitle, _endStats;
@@ -74,6 +74,13 @@ public partial class HUD : CanvasLayer
         _timer.OffsetLeft = -240f; _timer.OffsetRight = -18f;
         _timer.OffsetTop = 14f; _timer.OffsetBottom = 44f;
         AddChild(_timer);
+
+        // top-left coins (garage economy)
+        _coins = MkLabel("金币 0", 20, new Color(0.98f, 0.88f, 0.5f), Godot.HorizontalAlignment.Left);
+        _coins.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.TopLeft);
+        _coins.OffsetLeft = 18f; _coins.OffsetTop = 14f;
+        _coins.OffsetRight = 200f; _coins.OffsetBottom = 44f;
+        AddChild(_coins);
 
         BuildReportButton();
         BuildToast();
@@ -163,22 +170,22 @@ public partial class HUD : CanvasLayer
         sub.OffsetLeft = 240f; sub.OffsetTop = 175f; sub.OffsetRight = 1040f; sub.OffsetBottom = 210f;
         _startOverlay.AddChild(sub);
 
-        float y = 250f;
+        float y = 215f;
         foreach (var def in LevelDef.All)
         {
-            var row = MkLabel(def.Title, 24, new Color(0.93f, 0.90f, 0.84f), Godot.HorizontalAlignment.Left);
-            row.OffsetLeft = 400f; row.OffsetTop = y; row.OffsetRight = 950f; row.OffsetBottom = y + 36f;
+            var row = MkLabel(def.Title, 22, new Color(0.93f, 0.90f, 0.84f), Godot.HorizontalAlignment.Left);
+            row.OffsetLeft = 400f; row.OffsetTop = y; row.OffsetRight = 950f; row.OffsetBottom = y + 34f;
             _startOverlay.AddChild(row);
-            y += 44f;
+            y += 38f;
         }
 
         var keys = MkLabel("↑ 油门 · ↓ 刹车 · ←→ 方向 · R/N/D 挂挡 · 空格 手刹 · G 报告我停好了 · 回车 重开",
             20, new Color(0.78f, 0.72f, 0.62f), Godot.HorizontalAlignment.Center);
-        keys.OffsetLeft = 140f; keys.OffsetTop = 560f; keys.OffsetRight = 1140f; keys.OffsetBottom = 596f;
+        keys.OffsetLeft = 140f; keys.OffsetTop = 568f; keys.OffsetRight = 1140f; keys.OffsetBottom = 602f;
         _startOverlay.AddChild(keys);
-        var pick = MkLabel("按 1-6 选关 · 回车从第 1 关开始", 22, new Color(1f, 0.88f, 0.6f),
-            Godot.HorizontalAlignment.Center);
-        pick.OffsetLeft = 340f; pick.OffsetTop = 610f; pick.OffsetRight = 940f; pick.OffsetBottom = 646f;
+        var pick = MkLabel("按 1-9 选关 · 0 自定义 · E 编辑器 · B 车库 · 回车从第 1 关开始", 22,
+            new Color(1f, 0.88f, 0.6f), Godot.HorizontalAlignment.Center);
+        pick.OffsetLeft = 240f; pick.OffsetTop = 612f; pick.OffsetRight = 1040f; pick.OffsetBottom = 648f;
         _startOverlay.AddChild(pick);
         AddChild(_startOverlay);
     }
@@ -239,15 +246,18 @@ public partial class HUD : CanvasLayer
     public void SetTimer(float seconds, int collisions) =>
         _timer.Text = $"{seconds:0.0}s · 碰撞 {collisions}";
 
-    /// <summary>Verdict overlay content — grade plus the geometry the check saw.</summary>
-    public void SetVerdict(Game.ParkResult r, float seconds, int collisions)
+    /// <summary>Verdict overlay content — grade, the geometry the check saw,
+    /// and the coin payout (0 on scripted demo runs).</summary>
+    public void SetVerdict(Game.ParkResult r, float seconds, int collisions, bool perfect, int reward)
     {
-        bool perfect = collisions == 0 && r.AngleDeg <= 5f && Mathf.Abs(r.LatOff) <= 0.15f;
         _endTitle.Text = perfect ? "★ 完美入库！" : "√ 停车入位成功！";
         _endStats.Text =
             $"用时 {seconds:0.0} 秒　·　碰撞 {collisions} 次　·　角度误差 {r.AngleDeg:0.0}°" +
-            $"　·　横向居中偏差 {Mathf.Abs(r.LatOff) * 100f:0} cm";
+            $"　·　横向居中偏差 {Mathf.Abs(r.LatOff) * 100f:0} cm" +
+            (reward > 0 ? $"　·　金币 +{reward}" : "");
     }
+
+    public void SetCoins(int n) => _coins.Text = $"金币 {n}";
 
     public void SetReportEnabled(bool on) => _report.Disabled = !on;
 

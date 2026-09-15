@@ -25,6 +25,13 @@ public partial class Game : Node3D
     private LevelDef _customDef = null!;
     private float _shake;
     private float _explodeCd;
+    private AudioStreamPlayer _jingle = null!;
+    private AudioStreamWav _fanfareNormal = null!;
+    private AudioStreamWav _fanfareSuv = null!;
+
+    /// <summary>Which success jingle the last verdict played ("normal"/"suv")
+    /// — asserted by --verify-features.</summary>
+    public string LastFanfare { get; private set; } = "";
 
     private int _levelIndex;
     private bool _started;
@@ -69,6 +76,7 @@ public partial class Game : Node3D
     private bool _ftPass = true;
     private int _ftCoins0;
     private string _ftCustomBackup = null!;
+    private string _ftSaveBackup = null!;
     private string _featuresLogPath = "";
     private bool _editorArg;
 
@@ -93,6 +101,13 @@ public partial class Game : Node3D
         _garage = new GarageUI(_car);
         AddChild(_garage);
         _car.ApplySkin(Garage.SelectedPaint);
+
+        // success fanfares (procedural wavs from tools/make_audio.py)
+        _fanfareNormal = LoadWav("res://assets/audio/success.wav");
+        _fanfareSuv = LoadWav("res://assets/audio/success_suv.wav");
+        _jingle = new AudioStreamPlayer();
+        AddChild(_jingle);
+
         var customDto = Editor.LoadCustomDto();
         _customDef = customDto != null ? Editor.DtoToDef(customDto) : null;
 
@@ -112,7 +127,16 @@ public partial class Game : Node3D
         }
 
         LoadLevel(_levelIndex);
-        _hud.ShowStart(!_demo && !_reportTest && !_hazardTest && !_featuresTest);
+
+        // scripted runs (demo/verify) always drive the sedan — the autopilot's
+        // kinematics are tuned for the 4.6 × 1.8 body; normal play uses the
+        // saved vehicle
+        bool scripted = _demo || _reportTest || _hazardTest || _featuresTest;
+        if (!scripted)
+            _car.SetVehicle(Garage.SelectedVehicleId == "suv"
+                ? Car.VehicleKind.Suv : Car.VehicleKind.Sedan);
+
+        _hud.ShowStart(!scripted);
         _started = _demo || _reportTest || _hazardTest || _featuresTest;
         if (_demo)
         {
@@ -184,6 +208,9 @@ public partial class Game : Node3D
         AddChild(_cam);
         _cam.MakeCurrent();
     }
+
+    private static AudioStreamWav LoadWav(string resPath) =>
+        AudioStreamWav.LoadFromBuffer(Godot.FileAccess.GetFileAsBytes(resPath));
 
     private void LoadLevel(int index)
     {
@@ -565,7 +592,7 @@ public partial class Game : Node3D
 
     // ═══════════════ parking report (「报告我停好了」→ verdict) ═══════════════
 
-    private (int inCount, bool angleOk) SlotGeometry()
+    private (int inCount, bool angleOk, float areaFrac) SlotGeometry()
     {
         var def = _level.Def;
         var basis = new Basis(Vector3.Up, Mathf.DegToRad(def.SlotYawDeg));
@@ -573,18 +600,71 @@ public partial class Game : Node3D
         Vector3 slotZ = basis.Z;  // width axis
 
         int inCount = 0;
+        var poly = new List<Vector2>();
         foreach (var c in _car.Corners())
         {
             Vector3 d = c - def.SlotCenter;
             float lx = d.Dot(slotX);
             float lz = d.Dot(slotZ);
+            poly.Add(new Vector2(lx, lz));
             if (Mathf.Abs(lx) <= def.SlotLen / 2f - 0.04f && Mathf.Abs(lz) <= def.SlotWid / 2f - 0.04f)
                 inCount++;
         }
 
+        // exact overlap fraction: clip the car polygon against the slot rect
+        // (Sutherland–Hodgman — both convex). The SUV verdict is area-based.
+        var clipped = ClipPoly(poly, def.SlotLen / 2f - 0.04f, def.SlotWid / 2f - 0.04f);
+        float carArea = _car.BodyLen * _car.BodyWid;
+        float areaFrac = clipped.Count < 3 ? 0f : Mathf.Abs(PolyArea(clipped)) / carArea;
+
         Vector3 fwd = -_car.GlobalTransform.Basis.Z;
         bool angleOk = Mathf.Abs(fwd.Dot(slotX)) >= Mathf.Cos(Mathf.DegToRad(def.AngleTolDeg));
-        return (inCount, angleOk);
+        return (inCount, angleOk, areaFrac);
+    }
+
+    private static List<Vector2> ClipPoly(List<Vector2> poly, float hx, float hz)
+    {
+        var cur = new List<Vector2>(poly);
+        cur = ClipHalfPlane(cur, 0, hx, true);     // x ≤ hx
+        cur = ClipHalfPlane(cur, 0, -hx, false);  // x ≥ -hx
+        cur = ClipHalfPlane(cur, 1, hz, true);     // y ≤ hz
+        cur = ClipHalfPlane(cur, 1, -hz, false);  // y ≥ -hz
+        return cur;
+    }
+
+    private static List<Vector2> ClipHalfPlane(List<Vector2> inPoly, int axis, float bound, bool keepLess)
+    {
+        var result = new List<Vector2>();
+        int n = inPoly.Count;
+        if (n == 0) return result;
+        for (int i = 0; i < n; i++)
+        {
+            var a = inPoly[i];
+            var b = inPoly[(i + 1) % n];
+            float av = axis == 0 ? a.X : a.Y;
+            float bv = axis == 0 ? b.X : b.Y;
+            bool ain = keepLess ? av <= bound : av >= bound;
+            bool bin = keepLess ? bv <= bound : bv >= bound;
+            if (ain) result.Add(a);
+            if (ain != bin)
+            {
+                float t = (bound - av) / (bv - av);
+                result.Add(a + (b - a) * t);
+            }
+        }
+        return result;
+    }
+
+    private static float PolyArea(List<Vector2> poly)
+    {
+        float s = 0f;
+        for (int i = 0; i < poly.Count; i++)
+        {
+            var a = poly[i];
+            var b = poly[(i + 1) % poly.Count];
+            s += a.X * b.Y - b.X * a.Y;
+        }
+        return s / 2f; // signed
     }
 
     /// <summary>Everything the verdict needs: slot fit, angle, stillness,
@@ -595,7 +675,7 @@ public partial class Game : Node3D
     private ParkResult EvaluateParking()
     {
         var def = _level.Def;
-        var (inCount, angleOk) = SlotGeometry();
+        var (inCount, angleOk, areaFrac) = SlotGeometry();
         var basis = new Basis(Vector3.Up, Mathf.DegToRad(def.SlotYawDeg));
         var fwd = -_car.GlobalTransform.Basis.Z;
         float angleDeg = Mathf.RadToDeg(Mathf.Acos(
@@ -605,11 +685,19 @@ public partial class Game : Node3D
         float latOff = d.Dot(basis.Z);   // width axis
         float longOff = d.Dot(basis.X);  // long axis
 
+        // fit rule: sedans need all four corners inside; the SUV is the
+        // relaxed special vehicle — up to 30% of its area may hang outside
+        bool suv = _car.Vehicle == Car.VehicleKind.Suv;
+        bool fit = suv ? areaFrac >= 0.70f : inCount == 4;
+
         var reasons = new List<string>();
         if (!still) reasons.Add("车辆还在移动，停稳后再报告");
-        if (inCount < 4) reasons.Add($"车身只有 {inCount}/4 个角在库位内");
+        if (!fit)
+            reasons.Add(suv
+                ? $"SUV 宽容判定允许 30% 面积在线外，当前约 {Mathf.Clamp(100f - areaFrac * 100f, 0f, 100f):0}% 在外"
+                : $"车身只有 {inCount}/4 个角在库位内");
         if (!angleOk) reasons.Add($"车身与库位长轴夹角 {angleDeg:0.0}°，超过 {def.AngleTolDeg:0}° 容差");
-        return new ParkResult(still && inCount == 4 && angleOk, inCount, angleDeg,
+        return new ParkResult(still && fit && angleOk, inCount, angleDeg,
             def.AngleTolDeg, still, latOff, longOff, reasons.ToArray());
     }
 
@@ -625,7 +713,17 @@ public partial class Game : Node3D
         if (r.Success)
         {
             _success = true;
-            _hud.SetVerdict(r, _timer, _car.CollisionCount);
+            bool suv = _car.Vehicle == Car.VehicleKind.Suv;
+            // the verdict jingle: normal arpeggio, or the SUV's brassier fanfare
+            _jingle.Stream = suv ? _fanfareSuv : _fanfareNormal;
+            LastFanfare = suv ? "suv" : "normal";
+            _jingle.Play();
+            bool perfect = _car.CollisionCount == 0 && r.AngleDeg <= 5f && Mathf.Abs(r.LatOff) <= 0.15f;
+            // scripted runs don't touch the player's wallet
+            int reward = (_demo || _reportTest) ? 0
+                : perfect ? Garage.PerfectReward : Garage.SuccessReward;
+            if (reward > 0) Garage.Award(reward);
+            _hud.SetVerdict(r, _timer, _car.CollisionCount, perfect, reward);
             _hud.ShowEnd(true);
             _hud.SetReportEnabled(false);
             if (_demo)
@@ -801,6 +899,214 @@ public partial class Game : Node3D
         return list.ToArray();
     }
 
+    // ═══════════════ --verify-features ═══════════════
+    // Drives the car directly through the same control API the demo uses:
+    // three weather showcases, a wall ram (explosion), a brake slide (skid
+    // marks), a perfect park (coin payout), a garage purchase, and an editor
+    // save→load→play round-trip. Screenshots every step for visual review.
+
+    private void RunFeaturesTest(float dt)
+    {
+        _ftTimer += dt;
+        switch (_ftStage)
+        {
+            case 0:
+                LoadLevel(6); // 第 7 关 · 暴雨侧位
+                Next();
+                break;
+            case 1:
+                if (_ftTimer > 1.5f) { _pendingShot = "verify_rain.png"; Next(); }
+                break;
+            case 2:
+                if (_ftTimer > 0.4f) { LoadLevel(7); Next(); } // 第 8 关 · 风雪窄巷
+                break;
+            case 3:
+                if (_ftTimer > 1.5f) { _pendingShot = "verify_snow.png"; Next(); }
+                break;
+            case 4:
+                if (_ftTimer > 0.4f)
+                {
+                    LoadLevel(8); // 第 9 关 · 烈日广场
+                    _car.ResetTo(new Vector3(5f, 0.8f, 2.0f), -90f); // frame the plaza + the patrol car
+                    Next();
+                }
+                break;
+            case 5:
+                if (_ftTimer > 1.5f) { _pendingShot = "verify_blaze.png"; Next(); }
+                break;
+            case 6:
+                if (_ftTimer > 0.4f) { LoadLevel(0); Next(); } // back to sunny L1
+                break;
+            case 7: // ram the east wall — the collision must explode
+                if (_ftTimer > 0.6f)
+                {
+                    _car.ResetTo(new Vector3(16.2f, 0.8f, 1.0f), -90f); // front pokes the wall
+                    Next();
+                }
+                break;
+            case 8:
+                if (_ftTimer > 0.5f)
+                {
+                    LogFt($"explosion bursts={_fx.BurstCount}", _fx.BurstCount >= 1);
+                    _car.ResetTo(new Vector3(4f, 0.8f, 3.8f), -90f); // open road, drive east
+                    _car.SelectGear(Car.Gear.D);
+                    _car.Throttle = 1f;
+                    Next();
+                }
+                break;
+            case 9:
+                if (_ftTimer > 1.3f)
+                {
+                    _car.Throttle = 0f;
+                    _car.BrakeInput = 1f;
+                    Next();
+                }
+                break;
+            case 10: // hard braking at speed must leave skid marks
+                if (_ftTimer > 0.5f)
+                {
+                    LogFt($"skid-marks live={_skids.LiveCount}", _skids.LiveCount > 0);
+                    _pendingShot = "verify_skid.png";
+                    Next();
+                }
+                break;
+            case 11: // park perfectly, report, expect the perfect payout
+                if (_ftTimer > 0.6f)
+                {
+                    // pin the wallet so the run is idempotent; the player's real
+                    // save is backed up and restored at the end of the test
+                    _ftSaveBackup = File.Exists(Garage.SavePath)
+                        ? File.ReadAllText(Garage.SavePath) : null!;
+                    Garage.ResetTo(0, "classic");
+                    _ftCoins0 = Garage.Coins;
+                    _car.ResetTo(new Vector3(6.5f, 0.8f, -2.6f), -90f);
+                    _car.BrakeInput = 1f;
+                    Next();
+                }
+                break;
+            case 12:
+                if (_ftTimer > 0.5f)
+                {
+                    ReportParked();
+                    LogFt($"garage-award coins={_ftCoins0}->{Garage.Coins} fanfare={LastFanfare}",
+                        Garage.Coins == _ftCoins0 + Garage.PerfectReward && LastFanfare == "normal");
+                    _pendingShot = "verify_verdict.png";
+                    Next();
+                }
+                break;
+            case 13: // buy + select a skin through the real API
+                if (_ftTimer > 0.5f)
+                {
+                    bool bought = Garage.TryBuy("ocean");
+                    bool selected = bought && Garage.TrySelect("ocean");
+                    LogFt($"garage-buy ocean bought={bought} coins={Garage.Coins}",
+                        bought && selected && Garage.Coins == _ftCoins0);
+                    _car.ApplySkin(Garage.SelectedPaint);
+                    _garage.Open();
+                    _pendingShot = "verify_garage.png";
+                    Next();
+                }
+                break;
+            case 14: // editor save → load → play round-trip
+                if (_ftTimer > 0.5f)
+                {
+                    _garage.Close();
+                    _ftCustomBackup = File.Exists(Editor.CustomPath)
+                        ? File.ReadAllText(Editor.CustomPath) : null!;
+                    Editor.SaveCustom(new Editor.CustomDto
+                    {
+                        Weather = "Rain",
+                        Walls = { new Editor.WallDto { C = new[] { 7f, 0.175f, -4.6f }, S = new[] { 24f, 0.35f, 0.35f } } },
+                        Parked = { new Editor.ParkedDto { X = 0.9f, Z = -2.6f, Yaw = 0, Color = 0 } },
+                        Peds = { new Editor.PedDto { Ax = 2, Az = 0.8f, Bx = 11, Bz = 0.8f } },
+                    });
+                    var dto = Editor.LoadCustomDto();
+                    bool loaded = dto != null && dto.Peds.Count == 1 && dto.Walls.Count == 1;
+                    if (loaded)
+                    {
+                        _customDef = Editor.DtoToDef(dto);
+                        LoadLevel(LevelDef.All.Length); // the custom slot
+                    }
+                    LogFt("editor round-trip save/load", loaded);
+                    Next();
+                }
+                break;
+            case 15:
+                if (_ftTimer > 1.2f)
+                {
+                    var hazards = SnapHazards();
+                    LogFt($"custom-level playable hazards={hazards.Length}",
+                        hazards.Length == 1 && _level.Def.Title == "自定义关卡");
+                    _pendingShot = "verify_custom.png";
+                    Next();
+                }
+                break;
+            case 16: // SUV relaxed verdict: same tilted pose — sedan rejects
+                if (_ftTimer > 0.5f)
+                {
+                    LoadLevel(0); // clears _success so ReportParked is live again
+                    Garage.ResetTo(1000, "classic");
+                    _car.SetVehicle(Car.VehicleKind.Sedan);
+                    // yaw -13°: still inside the 15° angle rule, but the sedan's
+                    // corners poke out of the 2.5 m strip while the SUV's area
+                    // fraction stays ≈94% — only the SUV rule accepts this
+                    _car.ResetTo(new Vector3(6.5f, 0.8f, -2.6f), -13f);
+                    _car.BrakeInput = 1f;
+                    Next();
+                }
+                break;
+            case 17:
+                if (_ftTimer > 0.4f)
+                {
+                    var rs = ReportParked();
+                    LogFt("suv-rule sedan-rejects", rs is { Success: false });
+                    bool bought = Garage.TryBuy("suv");
+                    bool sel = bought && Garage.TrySelectVehicle("suv");
+                    LogFt($"suv garage buy/select bought={bought} coins={Garage.Coins}",
+                        bought && sel && Garage.Coins == 200);
+                    _car.SetVehicle(Car.VehicleKind.Suv);
+                    _car.ResetTo(new Vector3(6.5f, 0.8f, -2.6f), -13f);
+                    _car.BrakeInput = 1f;
+                    Next();
+                }
+                break;
+            case 18: // ...and the SUV accepts it, with its own fanfare
+                if (_ftTimer > 2.2f) // let the fail-report cooldown lapse
+                {
+                    var rs2 = ReportParked();
+                    LogFt($"suv-rule suv-accepts fanfare={LastFanfare}",
+                        rs2 is { Success: true } && LastFanfare == "suv");
+                    _pendingShot = "verify_suv.png";
+                    Next();
+                }
+                break;
+            case 19: // restore the player's custom file and garage save, then report
+                if (_ftTimer > 0.5f)
+                {
+                    if (_ftCustomBackup != null) File.WriteAllText(Editor.CustomPath, _ftCustomBackup);
+                    else if (File.Exists(Editor.CustomPath)) File.Delete(Editor.CustomPath);
+                    if (_ftSaveBackup != null) File.WriteAllText(Garage.SavePath, _ftSaveBackup);
+                    else if (File.Exists(Garage.SavePath)) File.Delete(Garage.SavePath);
+                    File.AppendAllText(_featuresLogPath,
+                        "RESULT FEATURES_TEST " + (_ftPass ? "PASS" : "FAIL") + "\n");
+                    GetTree().Quit(_ftPass ? 0 : 1);
+                }
+                break;
+        }
+    }
+
+    private void Next()
+    {
+        _ftStage++;
+        _ftTimer = 0f;
+    }
+
+    private void LogFt(string what, bool ok)
+    {
+        _ftPass &= ok;
+        File.AppendAllText(_featuresLogPath, what + (ok ? " ok" : " BAD") + "\n");
+    }
+
     public override void _PhysicsProcess(double delta)
     {
         float dt = (float)delta;
@@ -871,6 +1177,7 @@ public partial class Game : Node3D
         // (the demo autopilot submits the same report once settled)
         _timer += dt;
         _hud.SetTimer(_timer, _car.CollisionCount);
+        _hud.SetCoins(Garage.Coins);
     }
 
     public override void _Process(double delta)

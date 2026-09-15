@@ -1,0 +1,11 @@
+features test
+explosion bursts=2 ok
+skid-marks live=20 ok
+garage-award coins=0->300 fanfare=normal ok
+garage-buy ocean bought=True coins=0 ok
+editor round-trip save/load ok
+custom-level playable hazards=1 ok
+suv-rule sedan-rejects ok
+suv garage buy/select bought=True coins=200 ok
+suv-rule suv-accepts fanfare=normal BAD
+RESULT FEATURES_TEST FAIL

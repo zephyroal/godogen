@@ -42,7 +42,7 @@ public partial class Hazard : AnimatableBody3D
         {
             Shape = def.Kind == HazardKind.Pedestrian
                 ? new CapsuleShape3D { Radius = 0.3f, Height = 1.4f }
-                : new BoxShape3D { Size = new Vector3(Car.BodyWid, 1.05f, Car.BodyLen) },
+                : new BoxShape3D { Size = new Vector3(Car.SedanWid, 1.05f, Car.SedanLen) },
             Position = def.Kind == HazardKind.Pedestrian
                 ? new Vector3(0, 0.7f, 0)
                 : new Vector3(0, 0.55f, 0),
@@ -106,19 +106,19 @@ public partial class Hazard : AnimatableBody3D
 
         g.AddChild(new MeshInstance3D
         {
-            Mesh = new BoxMesh { Size = new Vector3(Car.BodyWid, 0.55f, Car.BodyLen) },
+            Mesh = new BoxMesh { Size = new Vector3(Car.SedanWid, 0.55f, Car.SedanLen) },
             MaterialOverride = paint,
             Position = new Vector3(0, 0.52f, 0),
         });
         g.AddChild(new MeshInstance3D
         {
-            Mesh = new BoxMesh { Size = new Vector3(Car.BodyWid - 0.14f, 0.30f, 2.16f) },
+            Mesh = new BoxMesh { Size = new Vector3(Car.SedanWid - 0.14f, 0.30f, 2.16f) },
             MaterialOverride = glass,
             Position = new Vector3(0, 0.95f, 0.25f),
         });
         g.AddChild(new MeshInstance3D
         {
-            Mesh = new BoxMesh { Size = new Vector3(Car.BodyWid - 0.2f, 0.20f, 2.0f) },
+            Mesh = new BoxMesh { Size = new Vector3(Car.SedanWid - 0.2f, 0.20f, 2.0f) },
             MaterialOverride = paint,
             Position = new Vector3(0, 1.20f, 0.22f),
         });
@@ -128,13 +128,13 @@ public partial class Hazard : AnimatableBody3D
             {
                 Mesh = new BoxMesh { Size = new Vector3(0.30f, 0.12f, 0.06f) },
                 MaterialOverride = light,
-                Position = new Vector3(x, 0.55f, -Car.BodyLen / 2f - 0.02f),
+                Position = new Vector3(x, 0.55f, -Car.SedanLen / 2f - 0.02f),
             });
             g.AddChild(new MeshInstance3D
             {
                 Mesh = new BoxMesh { Size = new Vector3(0.30f, 0.12f, 0.06f) },
                 MaterialOverride = tail,
-                Position = new Vector3(x, 0.55f, Car.BodyLen / 2f + 0.02f),
+                Position = new Vector3(x, 0.55f, Car.SedanLen / 2f + 0.02f),
             });
         }
         foreach (var (x, z) in new[] { (-0.80f, -1.48f), (0.80f, -1.48f), (-0.80f, 1.48f), (0.80f, 1.48f) })
