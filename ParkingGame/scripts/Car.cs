@@ -65,7 +65,20 @@ public partial class Car : VehicleBody3D
 
         BuildVisuals();
 
-        BodyEntered += OnBodyEntered;
+        // Collision bookkeeping runs on a trigger Area3D, not RigidBody.BodyEntered:
+        // the rigid contact monitor never reports kinematic (AnimatableBody3D)
+        // hazards — the pedestrian physically plows the car, yet no signal fires.
+        // Areas overlap-detect every body type: walls, cones, walkers, patrol cars.
+        // (The area also sees the car's own body — the `body == this` guard in
+        // OnBodyEntered filters that.)
+        var hitbox = new Area3D { Name = "Hitbox" };
+        hitbox.AddChild(new CollisionShape3D
+        {
+            Shape = new BoxShape3D { Size = new Vector3(BodyWid - 0.02f, 1.05f, BodyLen - 0.02f) },
+            Position = new Vector3(0, 0.55f, 0),
+        });
+        hitbox.BodyEntered += OnBodyEntered;
+        AddChild(hitbox);
     }
 
     private VehicleWheel3D MakeWheel(Vector3 pos, bool steering, bool traction = false)
@@ -91,24 +104,86 @@ public partial class Car : VehicleBody3D
 
     private void BuildVisuals()
     {
-        var red = new StandardMaterial3D { AlbedoColor = new Color(0.82f, 0.27f, 0.24f) };
-        var dark = new StandardMaterial3D { AlbedoColor = new Color(0.14f, 0.15f, 0.17f) };
-        var tire = new StandardMaterial3D { AlbedoColor = new Color(0.09f, 0.09f, 0.10f) };
+        var red = new StandardMaterial3D
+        {
+            AlbedoColor = new Color(0.82f, 0.27f, 0.24f),
+            Roughness = 0.32f,
+            Metallic = 0.12f, // paint with a hint of clearcoat for the sun to read
+        };
+        var dark = new StandardMaterial3D { AlbedoColor = new Color(0.14f, 0.15f, 0.17f), Roughness = 0.5f };
+        var glass = new StandardMaterial3D
+        {
+            AlbedoColor = new Color(0.10f, 0.13f, 0.16f, 0.85f),
+            Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+            Roughness = 0.08f,
+            Metallic = 0.9f,
+        };
+        var tire = new StandardMaterial3D { AlbedoColor = new Color(0.09f, 0.09f, 0.10f), Roughness = 0.95f };
+        var hub = new StandardMaterial3D { AlbedoColor = new Color(0.62f, 0.63f, 0.66f), Roughness = 0.4f, Metallic = 0.8f };
+        var headlight = new StandardMaterial3D
+        {
+            AlbedoColor = new Color(1f, 0.97f, 0.85f),
+            EmissionEnabled = true,
+            Emission = new Color(1f, 0.95f, 0.8f),
+            EmissionEnergyMultiplier = 1.6f,
+        };
+        var taillight = new StandardMaterial3D
+        {
+            AlbedoColor = new Color(0.9f, 0.1f, 0.1f),
+            EmissionEnabled = true,
+            Emission = new Color(1f, 0.12f, 0.1f),
+            EmissionEnergyMultiplier = 1.2f,
+        };
 
         var body = new MeshInstance3D
         {
             Mesh = new BoxMesh { Size = new Vector3(BodyWid, 0.55f, BodyLen) },
-            MaterialOverlay = red,
+            MaterialOverride = red,
             Position = new Vector3(0, 0.52f, 0),
         };
         AddChild(body);
-        var cabin = new MeshInstance3D
+
+        // cabin: dark glass band wrapped by a painted roof
+        var windows = new MeshInstance3D
         {
-            Mesh = new BoxMesh { Size = new Vector3(BodyWid - 0.2f, 0.48f, 2.1f) },
-            MaterialOverride = dark,
-            Position = new Vector3(0, 1.02f, 0.25f),
+            Mesh = new BoxMesh { Size = new Vector3(BodyWid - 0.14f, 0.30f, 2.16f) },
+            MaterialOverride = glass,
+            Position = new Vector3(0, 0.95f, 0.25f),
         };
-        AddChild(cabin);
+        AddChild(windows);
+        var roof = new MeshInstance3D
+        {
+            Mesh = new BoxMesh { Size = new Vector3(BodyWid - 0.2f, 0.20f, 2.0f) },
+            MaterialOverride = red,
+            Position = new Vector3(0, 1.20f, 0.22f),
+        };
+        AddChild(roof);
+
+        // bumpers + lights (front = -Z)
+        foreach (var z in new[] { -BodyLen / 2f - 0.03f, BodyLen / 2f + 0.03f })
+        {
+            AddChild(new MeshInstance3D
+            {
+                Mesh = new BoxMesh { Size = new Vector3(BodyWid + 0.06f, 0.30f, 0.12f) },
+                MaterialOverride = dark,
+                Position = new Vector3(0, 0.38f, z),
+            });
+        }
+        foreach (var x in new[] { -0.55f, 0.55f })
+        {
+            AddChild(new MeshInstance3D
+            {
+                Mesh = new BoxMesh { Size = new Vector3(0.30f, 0.12f, 0.06f) },
+                MaterialOverride = headlight,
+                Position = new Vector3(x, 0.55f, -BodyLen / 2f - 0.02f),
+            });
+            AddChild(new MeshInstance3D
+            {
+                Mesh = new BoxMesh { Size = new Vector3(0.30f, 0.12f, 0.06f) },
+                MaterialOverride = taillight,
+                Position = new Vector3(x, 0.55f, BodyLen / 2f + 0.02f),
+            });
+        }
 
         foreach (var (x, z) in new[] { (-0.80f, -1.48f), (0.80f, -1.48f), (-0.80f, 1.48f), (0.80f, 1.48f) })
         {
@@ -120,6 +195,14 @@ public partial class Car : VehicleBody3D
                 Rotation = new Vector3(0, 0, Mathf.Pi / 2f), // cylinder axis → X
             };
             pivot.AddChild(mesh);
+            // hubcap flush with the wheel's outer face
+            pivot.AddChild(new MeshInstance3D
+            {
+                Mesh = new CylinderMesh { TopRadius = 0.17f, BottomRadius = 0.17f, Height = 0.05f },
+                MaterialOverride = hub,
+                Rotation = new Vector3(0, 0, Mathf.Pi / 2f),
+                Position = new Vector3(Mathf.Sign(x) * 0.13f, 0, 0),
+            });
             AddChild(pivot);
             if (z < 0)
             {

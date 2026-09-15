@@ -24,6 +24,7 @@ public class LevelDef
     public List<BoxDef> Walls { get; } = new();
     public List<ParkedDef> Parked { get; } = new();
     public List<Vector3> Cones { get; } = new();
+    public List<HazardDef> Hazards { get; } = new();
 
     public static readonly LevelDef[] All =
     {
@@ -53,12 +54,18 @@ public class LevelDef
             new ParkedDef(new Vector3(0.9f, 0, -2.6f), 0f, Silver),
             new ParkedDef(new Vector3(12.1f, 0, -2.6f), 0f, Blue),
         },
+        Hazards =
+        {
+            // ambient walker on the far-east boundary — never crosses the demo arc
+            new HazardDef(HazardKind.Pedestrian,
+                new[] { new Vector3(17.0f, 0, 4.5f), new Vector3(17.0f, 0, -4.0f) }, 1.0f),
+        },
     };
 
     private static LevelDef L2() => new()
     {
         Title = "第 2 关 · 窄位极限",
-        Hint = "5.3 米车位对 4.6 米车身——前后只有 0.35 米余量",
+        Hint = "5.3 米车位对 4.6 米车身——前后只有 0.35 米余量，当心路上行人",
         Spawn = new Vector3(13.8f, 0.8f, 2.0f), SpawnYawDeg = -90f,
         SlotCenter = new Vector3(6.5f, 0, -2.6f), SlotLen = 5.3f, SlotWid = 2.4f,
         Walls =
@@ -73,13 +80,19 @@ public class LevelDef
             new ParkedDef(new Vector3(0.65f, 0, -2.6f), 0f, Silver),
             new ParkedDef(new Vector3(12.35f, 0, -2.6f), 0f, Blue),
         },
+        Hazards =
+        {
+            // crosses the road right where the S-approach runs
+            new HazardDef(HazardKind.Pedestrian,
+                new[] { new Vector3(2f, 0, 0.8f), new Vector3(11f, 0, 0.8f) }, 1.1f),
+        },
     };
 
     private static LevelDef L3() => new()
     {
         Title = "第 3 关 · 直角巷道",
-        Hint = "先直线倒出巷道口，再摆尾进左侧车位",
-        Spawn = new Vector3(12f, 0.8f, 15.5f), SpawnYawDeg = 0f,
+        Hint = "先直线倒出巷道口，再摆尾进左侧车位——巷道里也有行人走动",
+        Spawn = new Vector3(12f, 0.8f, 15.5f), SpawnYawDeg = 180f,
         SlotCenter = new Vector3(5.5f, 0, -3.0f), SlotLen = 6.0f, SlotWid = 2.5f,
         CamH = 17f, CamBack = 8f,
         Walls =
@@ -98,12 +111,21 @@ public class LevelDef
             new ParkedDef(new Vector3(0.0f, 0, -3.0f), 0f, Green),
             new ParkedDef(new Vector3(11.0f, 0, -3.0f), 0f, Yellow),
         },
+        Hazards =
+        {
+            // walks the lower lot, right across the swing-out zone
+            new HazardDef(HazardKind.Pedestrian,
+                new[] { new Vector3(0f, 0, -1.0f), new Vector3(8f, 0, -1.0f) }, 1.0f),
+            // ambles up and down the alley behind the spawn point
+            new HazardDef(HazardKind.Pedestrian,
+                new[] { new Vector3(12f, 0, 6f), new Vector3(12f, 0, 11f) }, 0.9f),
+        },
     };
 
     private static LevelDef L4() => new()
     {
         Title = "第 4 关 · 斜列式车位",
-        Hint = "45° 斜位——控制好倒车角度，别蹭邻车",
+        Hint = "45° 斜位——控制好倒车角度，别蹭邻车，注意巡逻车",
         Spawn = new Vector3(14.8f, 0.8f, 3.0f), SpawnYawDeg = -90f,
         SlotCenter = new Vector3(7f, 0, -2.8f), SlotYawDeg = 45f,
         SlotLen = 5.6f, SlotWid = 2.6f,
@@ -120,12 +142,21 @@ public class LevelDef
             new ParkedDef(new Vector3(0.4f, 0, -2.8f), 45f, Silver),
             new ParkedDef(new Vector3(13.6f, 0, -2.8f), 45f, Blue),
         },
+        Hazards =
+        {
+            // crosses the diagonal approach; the amber patrol car laps the road
+            new HazardDef(HazardKind.Pedestrian,
+                new[] { new Vector3(2f, 0, 1.1f), new Vector3(8f, 0, 1.1f) }, 1.1f),
+            new HazardDef(HazardKind.PatrolCar,
+                new[] { new Vector3(-3f, 0, 3.9f), new Vector3(10f, 0, 3.9f),
+                        new Vector3(10f, 0, 2.4f), new Vector3(-3f, 0, 2.4f) }, 2.6f),
+        },
     };
 
     private static LevelDef L5() => new()
     {
         Title = "第 5 关 · 障碍绕行",
-        Hint = "避开锥桶与横停车辆——碰撞会记入成绩",
+        Hint = "避开锥桶与横停车辆——碰撞会记入成绩，行人正在穿行",
         Spawn = new Vector3(14.2f, 0.8f, 2.4f), SpawnYawDeg = -90f,
         SlotCenter = new Vector3(6.5f, 0, -2.6f), SlotLen = 6.0f, SlotWid = 2.5f,
         Walls =
@@ -148,13 +179,21 @@ public class LevelDef
             new Vector3(8.0f, 0, 1.6f),
             new Vector3(10.8f, 0, 5.4f),
         },
+        Hazards =
+        {
+            // one crossing the shuffling zone, one pacing the far-east strip
+            new HazardDef(HazardKind.Pedestrian,
+                new[] { new Vector3(2f, 0, 0.2f), new Vector3(14f, 0, 0.2f) }, 1.1f),
+            new HazardDef(HazardKind.Pedestrian,
+                new[] { new Vector3(16.5f, 0, 5.5f), new Vector3(16.5f, 0, -0.8f) }, 0.9f),
+        },
     };
 
     private static LevelDef L6() => new()
     {
         Title = "第 6 关 · 墙缝极限",
-        Hint = "库宽 2.15 米、车宽 1.8 米——先摆正车身，再直线倒进",
-        Spawn = new Vector3(0.5f, 0.8f, 4.2f), SpawnYawDeg = 180f,
+        Hint = "库宽 2.15 米、车宽 1.8 米——先摆正车身，再直线倒进，留意两侧行人",
+        Spawn = new Vector3(0.5f, 0.8f, 2.9f), SpawnYawDeg = 180f,
         SlotCenter = new Vector3(0, 0, -3.2f), SlotYawDeg = 90f,
         SlotLen = 5.5f, SlotWid = 2.15f, AngleTolDeg = 10f,
         CamH = 14f, CamBack = 6f,
@@ -172,11 +211,20 @@ public class LevelDef
             new ParkedDef(new Vector3(-3.1f, 0, -3.2f), 90f, Green),
             new ParkedDef(new Vector3(3.1f, 0, -3.2f), 90f, Yellow),
         },
+        Hazards =
+        {
+            // walkers on both flanks of the reverse corridor — straight back stays clear
+            new HazardDef(HazardKind.Pedestrian,
+                new[] { new Vector3(2.5f, 0, 1.2f), new Vector3(6.5f, 0, 1.2f) }, 1.0f),
+            new HazardDef(HazardKind.Pedestrian,
+                new[] { new Vector3(-6.5f, 0, 1.2f), new Vector3(-2.5f, 0, 1.2f) }, 1.2f),
+        },
     };
 }
 
 /// <summary>Builds one scenario procedurally: floor, painted slot, walls,
-/// parked cars, cones. Pure static geometry — the only dynamic body is the player car.</summary>
+/// parked cars, cones, moving hazards. Static geometry plus kinematic
+/// hazards — the only dynamic physics body is the player car.</summary>
 public partial class Level : Node3D
 {
     public LevelDef Def = new();
@@ -193,6 +241,8 @@ public partial class Level : Node3D
             level.AddParkedCar(p);
         foreach (var c in def.Cones)
             level.AddCone(c);
+        foreach (var h in def.Hazards)
+            level.AddChild(Hazard.Build(h));
         return level;
     }
 
@@ -232,11 +282,15 @@ public partial class Level : Node3D
         };
         pivot.AddChild(fill);
 
-        // white border strips (long axis = local X)
+        // white border strips (long axis = local X); emissive so the Glow
+        // post-process picks them up as freshly painted markings
         var white = new StandardMaterial3D
         {
             AlbedoColor = new Color(0.92f, 0.92f, 0.90f),
             ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+            EmissionEnabled = true,
+            Emission = new Color(0.72f, 0.72f, 0.66f),
+            EmissionEnergyMultiplier = 0.9f,
         };
         float th = 0.10f, h = 0.03f;
         var strips = new[]
@@ -273,21 +327,35 @@ public partial class Level : Node3D
             Shape = new BoxShape3D { Size = new Vector3(Car.BodyWid, 1.05f, Car.BodyLen) },
             Position = new Vector3(0, 0.55f, 0),
         });
-        var paint = new StandardMaterial3D { AlbedoColor = p.Color };
+        var paint = new StandardMaterial3D { AlbedoColor = p.Color, Roughness = 0.4f, Metallic = 0.1f };
         var chassis = new MeshInstance3D
         {
             Mesh = new BoxMesh { Size = new Vector3(Car.BodyWid, 0.55f, Car.BodyLen) },
             MaterialOverride = paint,
             Position = new Vector3(0, 0.52f, 0),
         };
-        var cabin = new MeshInstance3D
+        // same glass-band + roof silhouette as the player car (lights off — parked)
+        var windows = new MeshInstance3D
         {
-            Mesh = new BoxMesh { Size = new Vector3(Car.BodyWid - 0.2f, 0.48f, 2.1f) },
-            MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.13f, 0.14f, 0.16f) },
-            Position = new Vector3(0, 1.02f, 0.25f),
+            Mesh = new BoxMesh { Size = new Vector3(Car.BodyWid - 0.14f, 0.30f, 2.16f) },
+            MaterialOverride = new StandardMaterial3D
+            {
+                AlbedoColor = new Color(0.10f, 0.13f, 0.16f, 0.85f),
+                Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+                Roughness = 0.08f,
+                Metallic = 0.9f,
+            },
+            Position = new Vector3(0, 0.95f, 0.25f),
+        };
+        var roof = new MeshInstance3D
+        {
+            Mesh = new BoxMesh { Size = new Vector3(Car.BodyWid - 0.2f, 0.20f, 2.0f) },
+            MaterialOverride = paint,
+            Position = new Vector3(0, 1.20f, 0.22f),
         };
         body.AddChild(chassis);
-        body.AddChild(cabin);
+        body.AddChild(windows);
+        body.AddChild(roof);
         AddChild(body);
     }
 

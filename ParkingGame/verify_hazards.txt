@@ -1,0 +1,17 @@
+hazard test
+LV1 spawn-collisions=0 ok
+LV1 hazards=1 moved=yes
+LV2 spawn-collisions=0 ok
+LV2 hazards=1 moved=yes
+LV2 ped-blocked dx=1.31 collisions=0 ok
+LV2 hazard-collision count=1 ok
+LV2 static-collision count=1 ok
+LV3 spawn-collisions=0 ok
+LV3 hazards=2 moved=yes
+LV4 spawn-collisions=0 ok
+LV4 hazards=2 moved=yes
+LV5 spawn-collisions=0 ok
+LV5 hazards=2 moved=yes
+LV6 spawn-collisions=0 ok
+LV6 hazards=2 moved=yes
+RESULT HAZARD_TEST PASS

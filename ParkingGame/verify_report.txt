@@ -1,0 +1,4 @@
+report test level=1
+REPORT1 expect-fail got=fail inSlot=2 angle=40.0 reasons=车身只有 2/4 个角在库位内; 车身与库位长轴夹角 40.0°，超过 15° 容差
+REPORT2 expect-pass got=pass inSlot=4 angle=0.0 lat=0.00
+RESULT REPORT_TEST PASS

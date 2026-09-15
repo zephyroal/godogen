@@ -1,14 +1,21 @@
+using System;
 using Godot;
 
 namespace ParkingGame;
 
-/// <summary>CanvasLayer UI: prompt, gear letter, speed, timer, start/end overlays.
-/// Every element is procedural (SystemFont), no assets.</summary>
+/// <summary>CanvasLayer UI: prompt, gear letter, speed, timer, the「报告我停好了」
+/// button, fail toast, start/verdict overlays. Every element is procedural
+/// (SystemFont), no assets.</summary>
 public partial class HUD : CanvasLayer
 {
-    private Label _prompt, _gear, _gearCap, _speed, _timer;
+    private Label _prompt, _gear, _gearCap, _speed, _timer, _toast;
+    private Button _report;
     private Control _startOverlay, _endOverlay;
     private Label _endTitle, _endStats;
+    private float _toastTtl;
+
+    /// <summary>Raised when the player asks for the parking verdict.</summary>
+    public event Action ReportRequested;
 
     private static SystemFont UiFont() => new()
     {
@@ -68,8 +75,73 @@ public partial class HUD : CanvasLayer
         _timer.OffsetTop = 14f; _timer.OffsetBottom = 44f;
         AddChild(_timer);
 
+        BuildReportButton();
+        BuildToast();
         BuildStartOverlay();
         BuildEndOverlay();
+    }
+
+    private void BuildReportButton()
+    {
+        _report = new Button
+        {
+            Text = "报告我停好了 (G)",
+            // keyboard focus would let Space (handbrake) "click" the button
+            FocusMode = Control.FocusModeEnum.None,
+        };
+        _report.AddThemeFontOverride("font", UiFont());
+        _report.AddThemeFontSizeOverride("font_size", 24);
+        _report.AddThemeColorOverride("font_color", new Color(0.97f, 0.98f, 0.94f));
+        _report.AddThemeColorOverride("font_hover_color", Colors.White);
+        _report.AddThemeColorOverride("font_pressed_color", new Color(0.85f, 1f, 0.85f));
+        _report.AddThemeColorOverride("font_disabled_color", new Color(0.6f, 0.65f, 0.6f));
+        foreach (var (state, bg) in new[] {
+                 ("normal", new Color(0.13f, 0.42f, 0.20f, 0.92f)),
+                 ("hover", new Color(0.18f, 0.55f, 0.26f, 0.95f)),
+                 ("pressed", new Color(0.10f, 0.34f, 0.16f, 0.95f)),
+                 ("disabled", new Color(0.25f, 0.28f, 0.26f, 0.85f)) })
+        {
+            _report.AddThemeStyleboxOverride(state, new StyleBoxFlat
+            {
+                BgColor = bg,
+                CornerRadiusTopLeft = 10, CornerRadiusTopRight = 10,
+                CornerRadiusBottomLeft = 10, CornerRadiusBottomRight = 10,
+                ContentMarginLeft = 22, ContentMarginRight = 22,
+                ContentMarginTop = 10, ContentMarginBottom = 10,
+            });
+        }
+        _report.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.CenterBottom);
+        _report.OffsetLeft = -140f; _report.OffsetRight = 140f;
+        _report.OffsetTop = -70f; _report.OffsetBottom = -18f;
+        _report.Pressed += () => ReportRequested?.Invoke();
+        AddChild(_report);
+    }
+
+    private void BuildToast()
+    {
+        _toast = MkLabel("", 22, new Color(1f, 0.62f, 0.55f), Godot.HorizontalAlignment.Center);
+        _toast.AddThemeStyleboxOverride("normal", new StyleBoxFlat
+        {
+            BgColor = new Color(0.12f, 0.10f, 0.10f, 0.85f),
+            CornerRadiusTopLeft = 8, CornerRadiusTopRight = 8,
+            CornerRadiusBottomLeft = 8, CornerRadiusBottomRight = 8,
+            ContentMarginLeft = 18, ContentMarginRight = 18,
+            ContentMarginTop = 8, ContentMarginBottom = 8,
+        });
+        _toast.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.CenterTop);
+        _toast.OffsetLeft = -430f; _toast.OffsetRight = 430f;
+        _toast.OffsetTop = 64f; _toast.OffsetBottom = 116f;
+        _toast.Visible = false;
+        AddChild(_toast);
+    }
+
+    public override void _Process(double delta)
+    {
+        if (_toastTtl > 0f)
+        {
+            _toastTtl -= (float)delta;
+            if (_toastTtl <= 0f) _toast.Visible = false;
+        }
     }
 
     private void BuildStartOverlay()
@@ -100,7 +172,7 @@ public partial class HUD : CanvasLayer
             y += 44f;
         }
 
-        var keys = MkLabel("↑ 油门 · ↓ 刹车 · ←→ 方向 · R/N/D 挂挡 · 空格 手刹 · 回车 重开",
+        var keys = MkLabel("↑ 油门 · ↓ 刹车 · ←→ 方向 · R/N/D 挂挡 · 空格 手刹 · G 报告我停好了 · 回车 重开",
             20, new Color(0.78f, 0.72f, 0.62f), Godot.HorizontalAlignment.Center);
         keys.OffsetLeft = 140f; keys.OffsetTop = 560f; keys.OffsetRight = 1140f; keys.OffsetBottom = 596f;
         _startOverlay.AddChild(keys);
@@ -167,9 +239,22 @@ public partial class HUD : CanvasLayer
     public void SetTimer(float seconds, int collisions) =>
         _timer.Text = $"{seconds:0.0}s · 碰撞 {collisions}";
 
-    public void SetEndStats(float seconds, int collisions)
+    /// <summary>Verdict overlay content — grade plus the geometry the check saw.</summary>
+    public void SetVerdict(Game.ParkResult r, float seconds, int collisions)
     {
-        _endTitle.Text = "√ 停车入位成功！";
-        _endStats.Text = $"用时 {seconds:0.0} 秒　·　碰撞 {collisions} 次";
+        bool perfect = collisions == 0 && r.AngleDeg <= 5f && Mathf.Abs(r.LatOff) <= 0.15f;
+        _endTitle.Text = perfect ? "★ 完美入库！" : "√ 停车入位成功！";
+        _endStats.Text =
+            $"用时 {seconds:0.0} 秒　·　碰撞 {collisions} 次　·　角度误差 {r.AngleDeg:0.0}°" +
+            $"　·　横向居中偏差 {Mathf.Abs(r.LatOff) * 100f:0} cm";
+    }
+
+    public void SetReportEnabled(bool on) => _report.Disabled = !on;
+
+    public void ShowFailToast(string[] reasons)
+    {
+        _toast.Text = "× 未通过：" + string.Join("；", reasons);
+        _toast.Visible = true;
+        _toastTtl = 4f;
     }
 }
