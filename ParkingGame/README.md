@@ -88,6 +88,9 @@ record_demo.bat   # 录制证明视频 → screenshots/movie/parking_demo.mp4
   文档直觉相反——前进（-Z）用负值，倒车用正值；C# 枚举名是 `Viewport.Msaa.Msaa8X`
   （大写 X）、`Viewport.ScreenSpaceAAEnum.Fxaa`；射线查询 `HitFromInside` 默认 false，
   从自身形状内部发出的射线不会自检命中（小怪前方探测利用了这一点）。
+- Windows bat 陷阱（实测）：**bat 内 `chcp 65001` + 非 ASCII 注释会让 cmd.exe 逐行读取
+  脱锚**，后续行被吞/错拼——Godot 被裸启动成项目管理器而不是游戏（子进程命令行无任何
+  参数即此症状）。本项目所有 .bat 一律纯 ASCII（英文注释/输出），不要写中文。
 
 ## 车辆物理（Car.cs）
 

@@ -6,6 +6,10 @@ namespace ParkingGame;
 public record BoxDef(Vector3 Center, Vector3 Size);
 public record ParkedDef(Vector3 Pos, float YawDeg, Color Color);
 
+/// <summary>Per-level weather: sky/sun/ambient/fog/particles and a grip scale
+/// applied to the player car's wheels (snow halves the friction).</summary>
+public enum WeatherKind { Sunny, Rain, Snow, Blaze }
+
 /// <summary>A scenario definition — everything the level builder and the slot
 /// check need. Slot convention: the LONG axis is local X; SlotYawDeg rotates it.
 /// Entry side is the +Z face of the slot in its own frame.</summary>
@@ -20,6 +24,7 @@ public class LevelDef
     public float SlotLen = 6.0f;
     public float SlotWid = 2.5f;
     public float AngleTolDeg = 15f;
+    public WeatherKind Weather = WeatherKind.Sunny;
     public float CamH = 15f, CamBack = 7f;
     public List<BoxDef> Walls { get; } = new();
     public List<ParkedDef> Parked { get; } = new();
@@ -28,7 +33,7 @@ public class LevelDef
 
     public static readonly LevelDef[] All =
     {
-        L1(), L2(), L3(), L4(), L5(), L6(),
+        L1(), L2(), L3(), L4(), L5(), L6(), L7(), L8(), L9(),
     };
 
     private static readonly Color Silver = new(0.75f, 0.77f, 0.80f);
@@ -218,6 +223,91 @@ public class LevelDef
                 new[] { new Vector3(2.5f, 0, 1.2f), new Vector3(6.5f, 0, 1.2f) }, 1.0f),
             new HazardDef(HazardKind.Pedestrian,
                 new[] { new Vector3(-6.5f, 0, 1.2f), new Vector3(-2.5f, 0, 1.2f) }, 1.2f),
+        },
+    };
+
+    private static LevelDef L7() => new()
+    {
+        Title = "第 7 关 · 暴雨侧位",
+        Hint = "雨天路滑——刹车距离变长，提前减速再回方向",
+        Spawn = new Vector3(13.8f, 0.8f, 2.2f), SpawnYawDeg = -90f,
+        SlotCenter = new Vector3(6.5f, 0, -2.6f), SlotLen = 5.8f, SlotWid = 2.5f,
+        Weather = WeatherKind.Rain,
+        Walls =
+        {
+            new BoxDef(new Vector3(7f, 0.175f, -4.6f), new Vector3(24f, 0.35f, 0.35f)),
+            new BoxDef(new Vector3(7f, 0.5f, 6.6f), new Vector3(24f, 1f, 0.4f)),
+            new BoxDef(new Vector3(-4.5f, 0.5f, 1.0f), new Vector3(0.4f, 1f, 11f)),
+            new BoxDef(new Vector3(18.5f, 0.5f, 1.0f), new Vector3(0.4f, 1f, 11f)),
+        },
+        Parked =
+        {
+            new ParkedDef(new Vector3(0.9f, 0, -2.6f), 0f, Silver),
+            new ParkedDef(new Vector3(12.1f, 0, -2.6f), 0f, Blue),
+        },
+        Hazards =
+        {
+            new HazardDef(HazardKind.Pedestrian,
+                new[] { new Vector3(2f, 0, 0.8f), new Vector3(11f, 0, 0.8f) }, 1.1f),
+        },
+    };
+
+    private static LevelDef L8() => new()
+    {
+        Title = "第 8 关 · 风雪窄巷",
+        Hint = "雪地抓地力只剩一半——动作更慢、方向更柔",
+        Spawn = new Vector3(13.8f, 0.8f, 2.0f), SpawnYawDeg = -90f,
+        SlotCenter = new Vector3(6.5f, 0, -2.6f), SlotLen = 5.2f, SlotWid = 2.35f,
+        AngleTolDeg = 12f,
+        Weather = WeatherKind.Snow,
+        Walls =
+        {
+            new BoxDef(new Vector3(7f, 0.175f, -4.35f), new Vector3(24f, 0.35f, 0.35f)),
+            new BoxDef(new Vector3(7f, 0.5f, 5.4f), new Vector3(24f, 1f, 0.4f)),
+            new BoxDef(new Vector3(-4.5f, 0.5f, 0.5f), new Vector3(0.4f, 1f, 11f)),
+            new BoxDef(new Vector3(18.5f, 0.5f, 0.5f), new Vector3(0.4f, 1f, 11f)),
+        },
+        Parked =
+        {
+            new ParkedDef(new Vector3(0.65f, 0, -2.6f), 0f, Silver),
+            new ParkedDef(new Vector3(12.35f, 0, -2.6f), 0f, Blue),
+        },
+        Hazards =
+        {
+            new HazardDef(HazardKind.Pedestrian,
+                new[] { new Vector3(3f, 0, 0.6f), new Vector3(10f, 0, 0.6f) }, 1.0f),
+        },
+    };
+
+    private static LevelDef L9() => new()
+    {
+        Title = "第 9 关 · 烈日广场",
+        Hint = "烈日刺眼——广场上有巡场车和行人，别慌",
+        Spawn = new Vector3(14.8f, 0.8f, 3.0f), SpawnYawDeg = -90f,
+        SlotCenter = new Vector3(7f, 0, -2.8f), SlotYawDeg = 45f,
+        SlotLen = 5.6f, SlotWid = 2.6f,
+        Weather = WeatherKind.Blaze,
+        Walls =
+        {
+            new BoxDef(new Vector3(7f, 0.5f, -7.6f), new Vector3(26f, 1f, 0.4f)),
+            new BoxDef(new Vector3(7f, 0.5f, 6.2f), new Vector3(26f, 1f, 0.4f)),
+            new BoxDef(new Vector3(-5.6f, 0.5f, -0.7f), new Vector3(0.4f, 1f, 14f)),
+            new BoxDef(new Vector3(19.6f, 0.5f, -0.7f), new Vector3(0.4f, 1f, 14f)),
+        },
+        Parked =
+        {
+            new ParkedDef(new Vector3(0.4f, 0, -2.8f), 45f, Silver),
+            new ParkedDef(new Vector3(13.6f, 0, -2.8f), 45f, Blue),
+        },
+        Hazards =
+        {
+            new HazardDef(HazardKind.Pedestrian,
+                new[] { new Vector3(2f, 0, 1.1f), new Vector3(8f, 0, 1.1f) }, 1.1f),
+            new HazardDef(HazardKind.Pedestrian,
+                new[] { new Vector3(11.5f, 0, 5.0f), new Vector3(11.5f, 0, 1.4f) }, 0.9f),
+            new HazardDef(HazardKind.PatrolCar,
+                new[] { new Vector3(-3f, 0, 3.9f), new Vector3(10f, 0, 3.9f),
+                        new Vector3(10f, 0, 2.4f), new Vector3(-3f, 0, 2.4f) }, 2.6f),
         },
     };
 }

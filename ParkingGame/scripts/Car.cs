@@ -40,6 +40,8 @@ public partial class Car : VehicleBody3D
     private float _steer;
     private float _collideCooldown;
     private readonly System.Collections.Generic.HashSet<Node> _recentHits = new();
+    private StandardMaterial3D _paintMat = null!;  // body+roof paint — swapped by the garage
+    private StandardMaterial3D _tailMat = null!;   // taillights — brighten while braking
 
     public int CollisionCount { get; private set; }
     public bool CollisionThisTick { get; private set; }
@@ -110,6 +112,7 @@ public partial class Car : VehicleBody3D
             Roughness = 0.32f,
             Metallic = 0.12f, // paint with a hint of clearcoat for the sun to read
         };
+        _paintMat = red;
         var dark = new StandardMaterial3D { AlbedoColor = new Color(0.14f, 0.15f, 0.17f), Roughness = 0.5f };
         var glass = new StandardMaterial3D
         {
@@ -132,8 +135,9 @@ public partial class Car : VehicleBody3D
             AlbedoColor = new Color(0.9f, 0.1f, 0.1f),
             EmissionEnabled = true,
             Emission = new Color(1f, 0.12f, 0.1f),
-            EmissionEnergyMultiplier = 1.2f,
+            EmissionEnergyMultiplier = 1.4f,
         };
+        _tailMat = taillight;
 
         var body = new MeshInstance3D
         {
@@ -212,6 +216,19 @@ public partial class Car : VehicleBody3D
     }
 
     public void SelectGear(Gear g) => CurrentGear = g;
+
+    /// <summary>Garage repaint: body + roof share the paint material.</summary>
+    public void ApplySkin(Color paint) => _paintMat.AlbedoColor = paint;
+
+    /// <summary>Brake lights: taillights glow much brighter while braking or on the handbrake.</summary>
+    public void SetBrakeLights(bool on) => _tailMat.EmissionEnergyMultiplier = on ? 3.2f : 1.4f;
+
+    /// <summary>Weather grip: scales every wheel's friction slip (snow ≈ 0.55, rain ≈ 0.78).</summary>
+    public void SetGrip(float scale)
+    {
+        foreach (var w in new[] { _fl, _fr, _rl, _rr })
+            w.WheelFrictionSlip = 11f * scale;
+    }
 
     public void ResetTo(Vector3 pos, float yawDeg)
     {
